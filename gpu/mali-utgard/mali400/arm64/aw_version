@@ -1,0 +1,14 @@
+mali400: r8p1-00rel0 um android oreo_mr1 arm64 001
+
+Upgrate to r8p1-00rel0
+
+Build parameters:
+VARIANT=mali400-r1p1-gles-linux-android-oreo-no_profiling-dma_buf-rgb_is_xrgb-no_Werror-egl_wait_sync
+TARGET_TOOLCHAIN=aarch64-linux-gcc
+TARGET_PLATFORM=default_8a
+CONFIG=release
+CROSS_COMPILE=aarch64-linux-
+
+MD5 Info:
+a0384b158902441c5941c4af430bd0dd  lib/libGLES_mali.so
+9a96306736094ad85abd8cb2a2826326  lib64/libGLES_mali.so
