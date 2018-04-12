@@ -26,6 +26,8 @@
 #include <hardware/gralloc.h>
 #endif
 
+#include <hardware/sunxi_metadata_def.h>
+
 #include "mali_gralloc_module.h"
 #include "mali_gralloc_bufferallocation.h"
 #include "mali_gralloc_ion.h"
@@ -1240,7 +1242,7 @@ int mali_gralloc_buffer_allocate(mali_gralloc_module *m, const gralloc_buffer_de
 
 		usage = bufDescriptor->consumer_usage | bufDescriptor->producer_usage;
 
-		err = gralloc_buffer_attr_allocate(hnd);
+		err = gralloc_buffer_attr_allocate(m, hnd);
 
 		if (err < 0)
 		{
@@ -1303,12 +1305,17 @@ int mali_gralloc_buffer_allocate(mali_gralloc_module *m, const gralloc_buffer_de
 		case HAL_PIXEL_FORMAT_YCrCb_420_SP:
 		case MALI_GRALLOC_FORMAT_INTERNAL_NV12:
 		case MALI_GRALLOC_FORMAT_INTERNAL_NV21:
+		case HAL_PIXEL_FORMAT_AW_NV12:
+		case HAL_PIXEL_FORMAT_AW_NV21:
+		case HAL_PIXEL_FORMAT_AW_NV12_10bit:
+		case HAL_PIXEL_FORMAT_AW_NV21_10bit:
 			hnd->aw_byte_align[0] = SUNXI_YUV_ALIGN;
 			hnd->aw_byte_align[1] = SUNXI_YUV_ALIGN;
 			hnd->aw_byte_align[2] = -1;
 			break;
 
 		/* YUV 8bit formats with three planes */
+		case HAL_PIXEL_FORMAT_AW_YV12_10bit:
 		case MALI_GRALLOC_FORMAT_INTERNAL_YV12:
 			hnd->aw_byte_align[0] = SUNXI_YUV_ALIGN;
 			hnd->aw_byte_align[1] = SUNXI_YUV_ALIGN;
@@ -1317,6 +1324,8 @@ int mali_gralloc_buffer_allocate(mali_gralloc_module *m, const gralloc_buffer_de
 
 		/* YUV 10bit formats with two planes */
 		case MALI_GRALLOC_FORMAT_INTERNAL_P010:
+		case HAL_PIXEL_FORMAT_AW_P010_UV:
+		case HAL_PIXEL_FORMAT_AW_P010_VU:
 			hnd->aw_byte_align[0] = SUNXI_YUV_ALIGN * 2;
 			hnd->aw_byte_align[1] = SUNXI_YUV_ALIGN * 2;
 			hnd->aw_byte_align[2] = -1;
@@ -1327,6 +1336,21 @@ int mali_gralloc_buffer_allocate(mali_gralloc_module *m, const gralloc_buffer_de
 			hnd->aw_byte_align[1] = -1;
 			hnd->aw_byte_align[2] = -1;
 			return -EINVAL;
+		}
+
+		switch (hnd->format)
+		{
+		case HAL_PIXEL_FORMAT_AW_YV12_10bit:
+		case HAL_PIXEL_FORMAT_AW_NV21_10bit:
+		case HAL_PIXEL_FORMAT_AW_P010_UV:
+		case HAL_PIXEL_FORMAT_AW_P010_VU:
+			hnd->ion_metadata_flag |= SUNXI_METADATA_FLAG_HDR_SATIC_METADATA;
+			break;
+		}
+
+		if (usage & GRALLOC_USAGE_AFBC_MODE)
+		{
+			hnd->ion_metadata_flag |= SUNXI_METADATA_FLAG_AFBC_HEADER;
 		}
 	}
 

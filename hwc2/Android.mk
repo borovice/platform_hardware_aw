@@ -35,10 +35,8 @@ LOCAL_SRC_FILES :=\
     threadResouce/hwc_event_thread.cpp \
     threadResouce/hwc_submit_thread.cpp
 
-ifeq ($(TARGET_USES_DE3),true)
 ifeq ($(USE_IOMMU),true)
 	LOCAL_CFLAGS += -DUSE_IOMMU
-endif
 endif
 
 LOCAL_SHARED_LIBRARIES := \
@@ -51,6 +49,15 @@ LOCAL_SHARED_LIBRARIES := \
     libion \
     libgui \
     libui
+
+ifeq ($(TARGET_PLATFORM),homlet)
+	LOCAL_SRC_FILES += other/homlet.cpp
+	LOCAL_CFLAGS += -DHOMLET_PLATFORM
+	LOCAL_C_INCLUDES += vendor/aw/homlet/hardware/include/display
+	LOCAL_SHARED_LIBRARIES += \
+	    libbinder \
+	    libhwcprivateservice
+endif
 
 LOCAL_C_INCLUDES += $(TARGET_HARDWARE_INCLUDE)
 LOCAL_C_INCLUDES += system/core/libion/include \

@@ -35,6 +35,8 @@ extern struct sunxi_data sunxi_data;
 
 void sunxi_init(void);
 
+extern char *get_heap_type_name(int heap_mask);
+
 static inline bool sunxi_secure(int usage)
 {
 	return (usage & GRALLOC_USAGE_PROTECTED) && (sunxi_data.secure_level == 1);

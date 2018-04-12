@@ -94,8 +94,12 @@ int ion_cam_alloc_open()
     }
     close(kernel_version_fd);
 #endif
-    g_alloc_context->flag_iommu = 0;
 
+#ifdef USE_IOMMU
+    g_alloc_context->flag_iommu = 1;
+#else
+    g_alloc_context->flag_iommu = 0;
+#endif
 
 #if DEBUG_ION_REF==1
     cam_use_mem = 0;

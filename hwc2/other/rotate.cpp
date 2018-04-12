@@ -50,9 +50,10 @@ int trBitMap;
 tr_per_disp_t *tr_disp;
 static pthread_mutex_t trCacheMutex;
 
+#ifndef USE_IOMMU
 bool mustconfig = 1;
-#ifdef USE_IOMMU
-mustconfig = 0;
+#else
+bool mustconfig = 0;
 #endif
 
 static inline int trFormatToHal(unsigned char tr)
@@ -165,18 +166,16 @@ bool hwc_rotate_settimeout(unsigned long client, unsigned long ms_time)
 int rotateDeviceInit(int numdisp)
 {
 
-	tr_disp = (tr_per_disp_t *)hwc_malloc(sizeof(tr_per_disp_t) * numdisp);
-	if(tr_disp == NULL) {
-		ALOGE("Failed to alloc client for ");
+	trfd = open("/dev/transform", O_RDWR);
+	if (trfd < 0) {
+		ALOGE("Failed to open transform device");
 		return -1;
 	}
-	memset(tr_disp, 0, sizeof(tr_per_disp_t) * numdisp);
-
-	trfd = open("/dev/transform", O_RDWR);
-	if(trfd < 0) {
-		ALOGE("Failed to open transform device");
-		hwc_free(tr_disp);
-		tr_disp = NULL;
+	tr_disp = (tr_per_disp_t *)hwc_malloc(sizeof(tr_per_disp_t) * numdisp);
+	if(tr_disp == NULL) {
+		close(trfd);
+		trfd = -1;
+		ALOGE("Failed to alloc client for hwc");
 		return -1;
 	}
 	pthread_mutex_init(&trCacheMutex, 0);

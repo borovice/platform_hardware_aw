@@ -39,6 +39,8 @@
 #include "SUN50IW3P1_A63.h"
 #elif defined VR9
 #include "SUN50IW3P1_VR9.h"
+#elif defined A50
+#include "SUN8IW15P1.h"
 #endif
 
 #define  POWER_HINT_BOOTCOMPLETE  0x00000010

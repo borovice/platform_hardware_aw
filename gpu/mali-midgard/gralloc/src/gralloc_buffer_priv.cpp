@@ -26,10 +26,13 @@
 #include <hardware/gralloc.h>
 #endif
 
+#include <ion/ion.h>
+
 #include "mali_gralloc_module.h"
 #include "mali_gralloc_private_interface_types.h"
 #include "mali_gralloc_buffer.h"
 #include "gralloc_buffer_priv.h"
+#include "gralloc_sunxi.h"
 
 /*
  * Allocate shared memory for attribute storage. Only to be
@@ -37,13 +40,15 @@
  *
  * Return 0 on success.
  */
-int gralloc_buffer_attr_allocate(private_handle_t *hnd)
+int gralloc_buffer_attr_allocate(mali_gralloc_module *m, private_handle_t *hnd)
 {
 	int rval = -1;
+	int heap_mask = ION_HEAP_SYSTEM_MASK;
+	ion_user_handle_t ion_hnd;
 
 	if (!hnd)
 	{
-		goto out;
+		return -1;
 	}
 
 	if (hnd->share_attr_fd >= 0)
@@ -52,60 +57,56 @@ int gralloc_buffer_attr_allocate(private_handle_t *hnd)
 		close(hnd->share_attr_fd);
 	}
 
-	hnd->share_attr_fd = ashmem_create_region("gralloc_shared_attr", PAGE_SIZE);
-
-	if (hnd->share_attr_fd < 0)
+	rval = ion_alloc(m->ion_client, PAGE_SIZE, 0, heap_mask, 0, &ion_hnd);
+	if (rval < 0)
 	{
-		ALOGE("Failed to allocate page for shared attribute region");
-		goto err_ashmem;
+		AERR("Failed to ion_alloc from ion_client %d for %d bytes metadata buffer via heap type %s (mask:%d)!\n",
+			m->ion_client, PAGE_SIZE, get_heap_type_name(heap_mask), heap_mask);
+		heap_mask = ION_HEAP_TYPE_DMA_MASK;
+		rval = ion_alloc(m->ion_client, PAGE_SIZE, 0, heap_mask, 0, &ion_hnd);
+		if (rval)
+		{
+			AERR("Failed to ion_alloc from ion_client %d for %d bytes metadata buffer via heap type %s (mask:%d)!\n",
+				m->ion_client, PAGE_SIZE, get_heap_type_name(heap_mask), heap_mask);
+			return -1;
+		}
+	}
+	rval = ion_share(m->ion_client, ion_hnd, &hnd->share_attr_fd);
+	if (rval < 0)
+	{
+		AERR("ion_share metadata buffer from ion client %d failed", m->ion_client);
+		if (0 != ion_free(m->ion_client, ion_hnd))
+			AERR("ion_free from ion client %d failed", m->ion_client);
+		return -1;
 	}
 
-	/*
-	 * Default protection on the shm region is PROT_EXEC | PROT_READ | PROT_WRITE.
-	 *
-	 * Personality flag READ_IMPLIES_EXEC which is used by some processes, namely gdbserver,
-	 * causes a mmap with PROT_READ to be translated to PROT_READ | PROT_EXEC.
-	 *
-	 * If we were to drop PROT_EXEC here with a call to ashmem_set_prot_region()
-	 * this can potentially cause clients to fail importing this gralloc attribute buffer
-	 * with EPERM error since PROT_EXEC is not allowed.
-	 *
-	 * Because of this we keep the PROT_EXEC flag.
-	 */
-
-	hnd->attr_base = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, hnd->share_attr_fd, 0);
-
-	if (hnd->attr_base != MAP_FAILED)
+	hnd->attr_base = (unsigned char*)mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, hnd->share_attr_fd, 0);
+	if (MAP_FAILED == hnd->attr_base)
 	{
-		/* The attribute region contains signed integers only.
-		 * The reason for this is because we can set a value less than 0 for
-		 * not-initialized values.
-		 */
-		attr_region *region = (attr_region *)hnd->attr_base;
-
-		memset(hnd->attr_base, 0xff, PAGE_SIZE);
-		munmap(hnd->attr_base, PAGE_SIZE);
-		hnd->attr_base = MAP_FAILED;
-	}
-	else
-	{
-		ALOGE("Failed to mmap shared attribute region");
-		goto err_ashmem;
-	}
-
-	rval = 0;
-	goto out;
-
-err_ashmem:
-
-	if (hnd->share_attr_fd >= 0)
-	{
+		AERR("ion_map metadata buffer from ion client %d failed", m->ion_client);
+		if (0 != ion_free(m->ion_client, ion_hnd))
+			AERR( "ion_free from ion client %d failed", m->ion_client);
 		close(hnd->share_attr_fd);
 		hnd->share_attr_fd = -1;
+		return -1;
 	}
 
-out:
-	return rval;
+	memset(hnd->attr_base, 0x0, PAGE_SIZE);
+
+	rval = munmap(hnd->attr_base, PAGE_SIZE);
+	if (rval < 0)
+	{
+		AERR("gralloc_buffer_attr_allocate munmap failed, aw_buf_id = %lld", hnd->aw_buf_id);
+	}
+
+	if (0 != ion_free(m->ion_client, ion_hnd))
+	{
+		AERR("Failed to ion_free(ion_client: %d ion_metadata_hnd: %d), aw_buf_id=%lld", m->ion_client,ion_hnd, hnd->aw_buf_id);
+	}
+
+	hnd->ion_metadata_size = PAGE_SIZE;
+
+	return 0;
 }
 
 /*

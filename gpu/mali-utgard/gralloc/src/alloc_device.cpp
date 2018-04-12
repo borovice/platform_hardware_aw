@@ -194,6 +194,10 @@ static int gralloc_alloc_buffer(alloc_device_t *dev, size_t size, int usage, buf
 		{
 			default_heap_mask = ION_HEAP_CARVEOUT_MASK;
 		}
+		else if (aw_mem_info.iommu_enabled)
+		{
+			default_heap_mask = ION_HEAP_SYSTEM_MASK;
+		}
 		else
 		{
 			default_heap_mask = ION_HEAP_TYPE_DMA_MASK;

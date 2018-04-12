@@ -26,7 +26,6 @@
 #include <hardware/gralloc.h>
 
 #include <sys/sysinfo.h>
-#include <cutils/properties.h>
 
 #include "gralloc_priv.h"
 #include "alloc_device.h"
@@ -82,6 +81,22 @@ static void get_carveout_enable(void)
 		aw_mem_info.carveout_enable = 1;
 }
 
+static void get_iommu_type(void)
+{
+	char iomem_type[PROPERTY_VALUE_MAX] = {0};
+
+	/*
+	 * ro.kernel.iomem.type
+	 * 0xaf10: IOMMU
+	 * 0xfa01: CMA
+	 */
+	property_get("ro.kernel.iomem.type", iomem_type, "0xfa01");
+	if (!strncmp(iomem_type, "0xaf10", 6))
+		aw_mem_info.iommu_enabled = true;
+	else
+		aw_mem_info.iommu_enabled = false;
+}
+
 static int gralloc_device_open(const hw_module_t *module, const char *name, hw_device_t **device)
 {
 	int status = -EINVAL;
@@ -99,10 +114,15 @@ static int gralloc_device_open(const hw_module_t *module, const char *name, hw_d
 	get_secure_level();
 	get_ion_flush_cache_range();
 	get_carveout_enable();
-	AINF("Dram size is %d MB\n", aw_mem_info.dram_size);
-	AINF("Secure level is %d\n", aw_mem_info.secure_level);
-	AINF("ION flush Cache range: %s\n", aw_mem_info.ion_flush_cache_range == 1 ? "Yes" : "No");
-	AINF("Carveout enable: %s\n",  aw_mem_info.carveout_enable == 1 ? "Yes" : "No");
+	get_iommu_type();
+	if (get_gralloc_debug())
+	{
+		AINF("Dram size is %d MB\n", aw_mem_info.dram_size);
+		AINF("Secure level is %d\n", aw_mem_info.secure_level);
+		AINF("ION flush Cache range: %s\n", aw_mem_info.ion_flush_cache_range == 1 ? "Yes" : "No");
+		AINF("Carveout enable: %s\n",  aw_mem_info.carveout_enable == 1 ? "Yes" : "No");
+		AINF("IOMMU is %s\n", aw_mem_info.iommu_enabled ? "enabled" : "disabled");
+	}
 
 	return status;
 }

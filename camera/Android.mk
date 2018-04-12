@@ -1,5 +1,8 @@
-
-LOCAL_PATH := $(call my-dir)
+CAMERA_HAL_LOCAL_PATH := $(call my-dir)
+ifneq ($(filter venus%,$(TARGET_BOARD_PLATFORM)),)
+include $(call all-subdir-makefiles)
+endif
+LOCAL_PATH := $(CAMERA_HAL_LOCAL_PATH)
 
 $(warning $(TARGET_BOARD_PLATFORM))
 ############################################################################
@@ -299,6 +302,10 @@ LOCAL_SRC_FILES := \
     SceneFactory/NightSceneMode.cpp \
     SceneFactory/SceneModeFactory.cpp
 
+ifeq ($(USE_IOMMU),true)
+    LOCAL_CFLAGS += -DUSE_IOMMU
+endif
+
 # choose hal for new driver or old
 SUPPORT_NEW_DRIVER := Y
 
@@ -338,13 +345,15 @@ LOCAL_CFLAGS += -D__A50__
 LOCAL_C_INCLUDES += \
     frameworks/av/media/libcedarc/include \
     hardware/aw/camera/libfacedetection \
-    hardware/aw/camera/SceneFactory
+    hardware/aw/camera/SceneFactory \
+    hardware/aw/camera/allwinnertech/libAWIspApi
 
 LOCAL_SHARED_LIBRARIES += \
     libvencoder \
     libfacedetection \
     libSmileEyeBlink \
-    libapperceivepeople
+    libapperceivepeople \
+    libAWIspApi
 endif
 
 ############################################################################

@@ -42,20 +42,13 @@ int submitLayerToDisplay(Display_t *disp, LayerSubmit_t *submitLayer)
 	return 0;
 }
 
-void submitDelayWork(Display_t *disp, unsigned count, bool all)
+void inline submitDelayWork(Display_t *disp, LayerSubmit_t *submitLayer)
 {
 	submitThread_t *myThread;
-	LayerSubmit_t *submitLayer;
-	struct listnode *node, *node4;
 
 	myThread = disp->commitThread;
-	list_for_each_safe(node, node4, &myThread->DelayHead) {
-		submitLayer = node_to_item(node, LayerSubmit_t, node);
-		if (count - submitLayer->frameCount < INT_MAX || all) {
-			myThread->delayDeal(disp, submitLayer);
-			submitLayerCachePut(submitLayer);
-		}
-	}
+	myThread->delayDeal(disp, submitLayer);
+	submitLayerCachePut(submitLayer);
 }
 
 void* submitThreadLoop(void *display)
@@ -63,10 +56,8 @@ void* submitThreadLoop(void *display)
 	Display_t *disp;
 	submitThread_t *myThread;
 	struct listnode comHead, *commitHead, *node, *node2, *node3, *node4;
-	LayerSubmit_t *submitLayer;
+	LayerSubmit_t *submitLayer = NULL, *preSubmit = NULL;
 	Layer_t *layer;
-	private_handle_t *handle;
-	struct sync_info preSync = {-1, 0};
 	bool rotate;
 
 	disp = (Display_t *)display;
@@ -140,23 +131,22 @@ reloop:
 			myThread->commitToDisplay(disp, submitLayer);
 
 			/* wait for vsync  and a vsync send 1 frame ,
-			  * so we wait for the last releasefence 
+			  * so we wait for the last releasefence
 			  */
 			list_remove(&submitLayer->node);
-			list_add_tail(&myThread->DelayHead, &submitLayer->node);
+			if (preSubmit != NULL) {
+				sync_wait(preSubmit->sync.fd,
+					(disp->displayConfigList[disp->activeConfigId]->vsyncPeriod / 1000000 +1));
+				submitDelayWork(disp, preSubmit);
+			}
 			myThread->diplayCount = submitLayer->frameCount;
 			myThread->SubmitCount = submitLayer->sync.count;
 
-			submitDelayWork(disp, preSync.count, 0);
-			if (preSync.fd >= 0) {
-				sync_wait(preSync.fd, 16);
-			}
-			preSync = submitLayer->sync;
-			preSync.count = myThread->diplayCount;
+			preSubmit = submitLayer;
 		}
 	}
-
-	submitDelayWork(disp, 0, 1);
+	if (preSubmit != NULL)
+		submitDelayWork(disp, preSubmit);
 	return NULL;
 }
 
@@ -167,12 +157,10 @@ submitThread_t* initSubmitThread(Display_t *disp)
 		ALOGE("malloc an err....");
 		return NULL;
 	}
-	memset(myThread, 0, sizeof(submitThread_t));
 	myThread->mutex = new Mutex();
 	myThread->cond = new Condition();
 
 	list_init(&myThread->SubmitHead);
-	list_init(&myThread->DelayHead);
 	disp->commitThread = myThread;
 	pthread_create(&myThread->thread_id, NULL, submitThreadLoop, disp);
 

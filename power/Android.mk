@@ -52,6 +52,10 @@ ifeq ($(TARGET_BOARD_PLATFORM), uranus)
 LOCAL_CFLAGS   += -DA63
 endif
 
+ifeq ($(TARGET_BOARD_PLATFORM), venus)
+LOCAL_CFLAGS   += -DA50
+endif
+
 LOCAL_SHARED_LIBRARIES := liblog libcutils
 LOCAL_MODULE_TAGS := optional
 
@@ -95,6 +99,10 @@ endif
 
 ifeq ($(TARGET_BOARD_PLATFORM), uranus)
 LOCAL_CFLAGS   += -DA63
+endif
+
+ifeq ($(TARGET_BOARD_PLATFORM), venus)
+LOCAL_CFLAGS   += -DA50
 endif
 
 include $(BUILD_EXECUTABLE)

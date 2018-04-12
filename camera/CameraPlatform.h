@@ -94,6 +94,26 @@
 #define USE_CSI_VIN_DRIVER
 #endif
 
+#ifdef __A50__
+#define __PLATFORM_A50__
+#define BUFFER_PHY_OFFSET 0
+#define GPU_BUFFER_ALIGN
+
+#define __CEDARX_FRAMEWORK_2__
+
+//#define __OPEN_FACEDECTION__
+//#define __OPEN_SMILEDECTION__
+//#define __OPEN_SMARTDECTION__
+//#define __OPEN_BLINKDECTION__
+
+
+#define USE_ION_MEM_ALLOCATOR
+
+//#define WATI_FACEDETECT
+#define USE_CSI_VIN_DRIVER
+#define USE_ISP
+#endif
+
 #ifdef USE_ION_MEM_ALLOCATOR
 extern "C" int ion_alloc_open();
 extern "C" int ion_alloc_close();

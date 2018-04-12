@@ -254,7 +254,8 @@ int PreviewWindow::lockBuffer(int index)
         if ((ret != NO_ERROR)||(ddr_vir[index] != virFromGralloc)) {
             LOGE("%s: grbuffer_mapper.lock failure: %d -> %s",
                 __FUNCTION__, ret, strerror(ret));
-            mPreviewWindow->cancel_buffer(mPreviewWindow, mBufferHandle[index]);
+            //Maybe the buffer queue has been abandoned,we should not cancel buffer.
+            //mPreviewWindow->cancel_buffer(mPreviewWindow, mBufferHandle[index]);
             return false;
         }
 
@@ -398,7 +399,8 @@ int PreviewWindow::onNextFrameAvailable2(int index)
         err = lockBuffer(dequeuedIdx);
         if(err != NO_ERROR)
         {
-            LOGE("unlockBuffer failed, err = %d \n", err);
+            LOGE("Oh,lockBuffer failed, err = %d,maybe buffer queue has been abandon.But we do not care.Right?\n", err);
+            dequeuedIdx = -1;
         }
     }
 

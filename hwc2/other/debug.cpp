@@ -271,6 +271,7 @@ int hwc_set_enhance_mode(int display, int cmd2, int data)
 int hwc_set_color_temperature(int display, int cmd2, int data)
 {
 	unusedpara(display);
+	unusedpara(cmd2);
 	return hwc_set_attr_info(COLOR_TEMPERATURE_ATTR, data);
 }
 
@@ -468,7 +469,7 @@ void showfps(Display_t *display)
 			if (!display->forceClient && display->frameCount > 100) {
 				 callRefresh(display);
 			}
-			display->forceClient = 1;
+			/* display->forceClient = 1; */
 		}else{
 			display->forceClient = 0;
 		}
@@ -559,7 +560,6 @@ void debugInit(int num)
 		ALOGE("malloc err for debuginit");
 		return ;
 	}
-	memset(hwcDebug->debugDisp, 0, sizeof(debugPerDisp_t) * num);
 	for(int i = 0;i < num; i++) {
 		hwcDebug->debugDisp[i].fPreTime = fCurrentTime;
 	}

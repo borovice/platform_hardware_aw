@@ -17,6 +17,10 @@
 #include "hwc.h"
 #include <utils/Trace.h>
 
+#ifdef HOMLET_PLATFORM
+#include "other/homlet.h"
+#endif
+
 static int numberDisplay;
 static Display_t **mDisplay;
 static int socketpair_fd[2];
@@ -966,9 +970,11 @@ int32_t hwc_set_layer_transform(hwc2_device_t* device, hwc2_display_t display,
         return HWC2_ERROR_BAD_DISPLAY;
     }
 
-    ly->transform = transform;
-	if (transform == 0)
+	ly->transform = transform;
+	if (transform == 0) {
 		trCachePut(ly);
+		ly->trcache = NULL;
+	}
 
     return HWC2_ERROR_NONE;
 }
@@ -1291,6 +1297,10 @@ static int hwc_device_open(const struct hw_module_t* module, const char* id,
 	memCtrlInit(mDisplay, numberDisplay);
 	registerEventCallback(0x03, HWC2_CALLBACK_HOTPLUG, 0,
 		NULL, (hwc2_function_pointer_t)deviceManger);
+
+#ifdef HOMLET_PLATFORM
+	init_homlet_service();
+#endif
 	ALOGD("open completely successful ");
     return 0;
 }

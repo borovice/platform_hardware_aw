@@ -25,22 +25,11 @@
 #include <sunxi_camera_v2.h>
 #endif
 
-
-
-
-#ifdef  __PLATFORM_A33__
-#define NB_BUFFER 6
-#elif defined __PLATFORM_A83__
-#define NB_BUFFER 8
-#elif defined __PLATFORM_A80__
-#define NB_BUFFER 8
-#elif defined __PLATFORM_A64__
-#define NB_BUFFER 8
-#elif defined __PLATFORM_A63__
-#define NB_BUFFER 8
-
+#ifdef USE_ISP
+#include "AWIspApi.h"
 #endif
 
+#define NB_BUFFER 8
 #define    MAX_YUV_SENSOR_PICTURE_SIZE (2592*1936*3>>1)    //just for yuv sensor
 #define MAX_PICTURE_SIZE (4608*3456*3>>1)
 #define MAX_HDR_PICTURE_SIZE (4608*3456*3>>1)
@@ -50,6 +39,9 @@ namespace android {
 class CameraHardware;
 class CallbackNotifier;
 class PreviewWindow;
+#ifdef USE_ISP
+class AWIspApi;
+#endif
 
 /*
  *
@@ -637,7 +629,10 @@ private:
     ISceneMode*                        mSceneMode;
     SceneModeFactory                mSceneModeFactory;
     int releaseIndex; //handle index for encoder callback to release
-
+#ifdef USE_ISP
+    AWIspApi                          *mAWIspApi;
+    int                               mIspId;
+#endif
 };
 
 }; /* namespace android */

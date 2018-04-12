@@ -20,6 +20,7 @@
 #define GRALLOC_PRIV_H_
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <errno.h>
 #include <linux/fb.h>
@@ -32,6 +33,8 @@
 #include <cutils/native_handle.h>
 #include <alloc_device.h>
 #include <utils/Log.h>
+
+#include <cutils/properties.h>
 
 #ifdef MALI_600
 #define GRALLOC_ARM_UMP_MODULE 0
@@ -357,6 +360,12 @@ typedef struct
 
 	/* If CARVEOUT HEAP is available, this should be true. */
 	bool carveout_enable;
+
+	/*
+	 * ro.kernel.iomem.type = 0xaf10 -> IOMMU is enabled
+	 * ro.kernel.iomem.type = 0xfa01 -> IOMMU is disabled
+	 */
+	bool iommu_enabled;
 }
 aw_mem_info_data;
 
@@ -366,5 +375,16 @@ typedef struct {
 }sunxi_cache_range;
 
 int aw_flush_cache(int ion_client, void* start_vaddr, int shared_fd, size_t size);
+
+static inline bool get_gralloc_debug(void)
+{
+	char gralloc_debug[PROPERTY_VALUE_MAX] = {0};
+
+	property_get("debug.gralloc.showmsg", gralloc_debug, "0");
+	if(atoi(gralloc_debug))
+		return true;
+
+	return false;
+}
 
 #endif /* GRALLOC_PRIV_H_ */

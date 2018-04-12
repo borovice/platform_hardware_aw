@@ -184,17 +184,18 @@ void submitLayerCachePut(LayerSubmit_t *submitLayer)
 
 	list_remove(&submitLayer->node);
 	list_init(&submitLayer->node);
+	list_init(&submitLayer->layerNode);
 
-	pthread_mutex_lock(&chaceMutex);
+	pthread_mutex_lock(&submitChaceMutex);
 	if (submit_cache_cout > LAYER_CACHE_SHRINK_NUM) {
         hwc_free(submitLayer);
-		pthread_mutex_unlock(&chaceMutex);
+		pthread_mutex_unlock(&submitChaceMutex);
 		return;
 	}
 
 	submit_cache_cout++;
 	list_add_tail(&submitCacheList, &submitLayer->node);
-	pthread_mutex_unlock(&chaceMutex);
+	pthread_mutex_unlock(&submitChaceMutex);
 
 }
 

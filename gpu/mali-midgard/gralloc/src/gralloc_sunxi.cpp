@@ -10,7 +10,8 @@ char str_heap_type[5][14] =
 	{"SYSTEM"},
 	{"SYSTEM_CONTIG"},
 	{"DMA"},
-	{"SECURE"}
+	{"SECURE"},
+	{"CARVEOUT"}
 };
 
 struct sunxi_data sunxi_data =
@@ -54,6 +55,48 @@ static void get_iommu_type(void)
 		sunxi_data.iommu_enabled = true;
 	else
 		sunxi_data.iommu_enabled = false;
+}
+
+char *get_heap_type_name(int heap_mask)
+{
+	int index;
+
+	switch(heap_mask)
+	{
+		case ION_HEAP_SYSTEM_MASK:
+			index = 0;
+			break;
+
+		case ION_HEAP_SYSTEM_CONTIG_MASK:
+			index = 1;
+			break;
+
+		case ION_HEAP_TYPE_DMA_MASK:
+			index = 2;
+			break;
+
+		case ION_HEAP_SECURE_MASK:
+			index = 3;
+			break;
+
+		case ION_HEAP_CARVEOUT_MASK:
+			index = 4;
+			break;
+
+		default:
+			AERR("Invalid heap mask %d!\n", heap_mask);
+			index = -1;
+			break;
+        }
+
+	if (index >= 0)
+	{
+		return str_heap_type[index];
+	}
+	else
+	{
+		return NULL;
+	}
 }
 
 void sunxi_init(void)

@@ -56,6 +56,10 @@ static struct mem_speed_limit_t mem_speed_limit[3] =
 		{672000, 49152000},
 		{552000, 49152000},
 		{432000, 30736000},
+#elif (TARGET_BOARD_PLATFORM == petrel)
+		{672000, 49152000},
+		{552000, 49152000},
+		{432000, 30736000},
 #else
 #error "please select a platform\n"
 #endif

@@ -977,8 +977,11 @@ void CallbackNotifier::onNextFrameHW(buffer_handle_t* handlebuffer,const void* f
     {
         if (NULL != mCam_buff[index] && NULL != mCam_buff[index]->data)
         {
+            pbuf->refMutex.lock();
             pbuf->refCnt++;
-            LOGV("mCam_buff[index]->data = 0x%x",mCam_buff[index]->data);
+            pbuf->refMutex.unlock();
+
+            LOGV("index = %d ,mCam_buff[index]->data = 0x%x,pbuf->refCnt = %d",index,mCam_buff[index]->data,pbuf->refCnt);
             memcpy(mCam_buff[index]->data, &mVideoNativeMetadata, sizeof(VideoNativeHandleMetadata));
             LOGV("CallbackNotifier::onNextFrameHW index = %d,mVideoNativeMetadata.pHandle = 0x%x,mCam_buff[%d]->data = 0x%x",
                               index,

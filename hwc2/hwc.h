@@ -173,7 +173,6 @@ typedef struct submitThread{
 	struct listnode SubmitHead;
 	Mutex *mutex;
 	Condition *cond;
-	struct listnode DelayHead;
 	unsigned SubmitCount;
 	unsigned diplayCount;
 	int32_t (*setupLayer)(Display_t* display, LayerSubmit_t*);
@@ -187,7 +186,7 @@ typedef struct sunxiDisplay{
 	DisplayConfig_t **displayConfigList;
 	int configNumber;
 	int activeConfigId;
-	int default_config;
+	int default_mode;
 	bool vsyncEn;
 	bool plugIn;
 	bool active;

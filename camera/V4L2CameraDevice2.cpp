@@ -333,6 +333,10 @@ V4L2CameraDevice::V4L2CameraDevice(CameraHardware* camera_hal,
       ,mMemOpsS(NULL)
       ,releaseIndex(-1)
       ,mDiscardFrameNum(0)
+#ifdef USE_ISP
+      ,mAWIspApi(NULL)
+      ,mIspId(-1)
+#endif
 {
     LOGV("V4L2CameraDevice construct");
 
@@ -473,19 +477,21 @@ status_t V4L2CameraDevice::connectDevice(HALCameraInfo * halInfo)
 
     // open v4l2 camera device
     int ret = openCameraDev(halInfo);
-        if (ret != OK)
-        {
+    if (ret != OK) {
             return ret;
-        }
+    }
 
     switch((v4l2_sensor_type)getSensorType()){
         case V4L2_SENSOR_TYPE_YUV:
-            LOGV("the sensor is YUV sensor");
+            LOGD("the sensor is YUV sensor");
             mSensor_Type = V4L2_SENSOR_TYPE_YUV;
             break;
         case V4L2_SENSOR_TYPE_RAW:
-            LOGV("the sensor is RAW sensor");
+            LOGD("the sensor is RAW sensor");
             mSensor_Type = V4L2_SENSOR_TYPE_RAW;
+#ifdef USE_ISP
+            mAWIspApi = new AWIspApi();
+#endif
             break;
         default:
             LOGE("get the sensor type failed");
@@ -536,6 +542,13 @@ END_ERROR:
         mG2DHandle = NULL;
     }
 #endif
+#ifdef USE_ISP
+    if (mAWIspApi != NULL) {
+        delete mAWIspApi;
+        mAWIspApi = NULL;
+    }
+#endif
+
     return UNKNOWN_ERROR;
 }
 
@@ -571,6 +584,13 @@ status_t V4L2CameraDevice::disconnectDevice()
 
     /* There is no device to disconnect from. */
     mCameraDeviceState = STATE_CONSTRUCTED;
+
+#ifdef USE_ISP
+    if (mAWIspApi != NULL) {
+        delete mAWIspApi;
+        mAWIspApi = NULL;
+    }
+#endif
 
     return NO_ERROR;
 }
@@ -668,6 +688,15 @@ status_t V4L2CameraDevice::startDevice(int width,
 
     // stream on the v4l2 device
     CHECK_NO_ERROR(v4l2StartStreaming());
+#ifdef USE_ISP
+    if (mSensor_Type == V4L2_SENSOR_TYPE_RAW) {
+        mIspId = -1;
+        mIspId = mAWIspApi->awIspGetIspId(mHalCameraInfo.device_id);
+        if (mIspId >= 0) {
+            mAWIspApi->awIspStart(mIspId);
+        }
+    }
+#endif
 
     mCameraDeviceState = STATE_STARTED;
 
@@ -708,6 +737,11 @@ status_t V4L2CameraDevice::stopDevice()
 
     // v4l2 device stop stream
     v4l2StopStreaming();
+#ifdef USE_ISP
+    if ((mSensor_Type == V4L2_SENSOR_TYPE_RAW) && (mIspId >= 0)) {
+        mAWIspApi->awIspStop(mIspId);
+    }
+#endif
 
     // v4l2 device unmap buffers
     v4l2UnmapBuf();
@@ -1015,7 +1049,10 @@ bool V4L2CameraDevice::captureThread()
         v4l2_buf.isThumbAvailable        = 0;
     }
 
+    v4l2_buf.refMutex.lock();
     v4l2_buf.refCnt = 1;
+    v4l2_buf.refMutex.unlock();
+
     memcpy(&mV4l2buf[v4l2_buf.index], &v4l2_buf, sizeof(V4L2BUF_t));
     if ((!mVideoHint) && (mTakePictureState != TAKE_PICTURE_NORMAL))
     {
@@ -1163,7 +1200,10 @@ bool V4L2CameraDevice::captureThread()
         }
 
         // add reference count
+        mV4l2buf[v4l2_buf.index].refMutex.lock();
         mV4l2buf[v4l2_buf.index].refCnt++;
+        mV4l2buf[v4l2_buf.index].refMutex.unlock();
+
         // signal a new frame for preview
         LOGV("signal a new frame for preview!");
         pthread_cond_signal(&mPreviewCond);
@@ -1194,7 +1234,11 @@ bool V4L2CameraDevice::captureThread()
                     pthread_cond_signal(&mPictureCond);
                     goto DEC_REF;
                 }
+
+                mV4l2buf[v4l2_buf.index].refMutex.lock();
                 mV4l2buf[v4l2_buf.index].refCnt++;
+                mV4l2buf[v4l2_buf.index].refMutex.unlock();
+
                 mTakePictureState = TAKE_PICTURE_NULL;  //stop take picture
                 mIsPicCopy = false;
                 pthread_cond_signal(&mPictureCond);
@@ -1278,7 +1322,10 @@ bool V4L2CameraDevice::captureThread()
             }
 
             // add reference count
+            mV4l2buf[v4l2_buf.index].refMutex.lock();
             mV4l2buf[v4l2_buf.index].refCnt++;
+            mV4l2buf[v4l2_buf.index].refMutex.unlock();
+
             mTakePictureState = TAKE_PICTURE_NULL;
             mIsPicCopy = false;
             pthread_cond_signal(&mPictureCond);
@@ -1304,7 +1351,9 @@ bool V4L2CameraDevice::captureThread()
                     goto DEC_REF;
                 }
             // add reference count
+            mV4l2buf[v4l2_buf.index].refMutex.lock();
             mV4l2buf[v4l2_buf.index].refCnt++;
+            mV4l2buf[v4l2_buf.index].refMutex.unlock();
             //mTakePictureState = TAKE_PICTURE_NULL;
             mIsPicCopy = false;
             pthread_cond_signal(&mSmartPictureCond);
@@ -1331,7 +1380,9 @@ bool V4L2CameraDevice::captureThread()
             mCallbackNotifier->setExifInfo(exif_attri,mZoomRatio,mExposureBias);
             mCameraHardware->setExifInfo(exif_attri);
             // add reference count
+            mV4l2buf[v4l2_buf.index].refMutex.lock();
             mV4l2buf[v4l2_buf.index].refCnt++;
+            mV4l2buf[v4l2_buf.index].refMutex.unlock();
             mIsPicCopy = false;
             pthread_cond_signal(&mContinuousPictureCond);
         }
@@ -2335,9 +2386,12 @@ void V4L2CameraDevice::releasePreviewFrame(int index)
 
     pthread_mutex_lock(&mCaptureMutex);
 
-    // decrease buffer reference count first, if the reference count is no more than 0, release it.
-    if (mV4l2buf[index].refCnt > 0
-        && --mV4l2buf[index].refCnt == 0)
+    // Decrease buffer reference count first.
+    mV4l2buf[index].refMutex.lock();
+    mV4l2buf[index].refCnt--;
+    mV4l2buf[index].refMutex.unlock();
+    // If the reference count is equal 0, release it.
+    if (mV4l2buf[index].refCnt == 0)
     {
         memset(&buf, 0, sizeof(v4l2_buffer));
 #ifdef USE_CSI_VIN_DRIVER

@@ -1409,7 +1409,6 @@ static int setActiveConfig(Display_t *display, DisplayConfig_t *config)
 
 int switchDisplay(Display_t *display, int type, int mode)
 {
-	DisplayConfig_t *config = NULL;
 	DisplayPrivate_t *hwdisplay;
 	DisplayConfigPrivate_t *hwconfig;
 	hwdisplay = toHwDisplay(display);
@@ -1418,8 +1417,8 @@ int switchDisplay(Display_t *display, int type, int mode)
 	if (type != (int)hwdisplay->type.type)
 		/* if chang for cvbs etc ,will add code */
 		return -1;
-	/* +1 for 3D */
-	for (i = 0; i < display->configNumber+1; i++) {
+
+	for (i = 0; i < display->configNumber; i++) {
 		hwconfig = toHwConfig(display->displayConfigList[i]);
 		if (display->displayConfigList[i]
 			&& hwconfig->mode == mode)
@@ -1432,11 +1431,7 @@ int switchDisplay(Display_t *display, int type, int mode)
 		return -1;
 	}
 	display->activeConfigId = i;
-	config = display->displayConfigList[i];
-	display->displayConfigList[i] = display->displayConfigList[0];
-	display->displayConfigList[0] = config;
-
-	return setActiveConfig(display, display->displayConfigList[0]);
+	return setActiveConfig(display, display->displayConfigList[i]);
 }
 
 Layer_t* de2creatLayer(Display_t* display)
@@ -1480,7 +1475,6 @@ int initPermanentDisplay(Display_t *display)
 		ALOGE("malloc display config err...");
 		return -1;
 	}
-	memset(config, 0, sizeof(DisplayConfig_t) + sizeof(DisplayConfigPrivate_t));
     refreshRate = 1000000000000LLU /
                     (uint64_t(info.upper_margin + info.lower_margin + info.vsync_len + info.yres)
                     * ( info.left_margin  + info.right_margin + info.hsync_len + info.xres)
@@ -1537,7 +1531,8 @@ loop:
 			arg[1] = hdmi_support[i].mode;
 			ret = ioctl(dispFd, DISP_HDMI_SUPPORT_MODE, arg);
 		}
-		if((ret > 0) || all_support)
+		if((ret > 0) || all_support
+			|| (numbconfig && hdmi_support[i].mode == DISP_TV_MOD_1080P_24HZ_3D_FP))
 			hdmi_support[i].support = 1;
 
 		else {
@@ -1545,7 +1540,7 @@ loop:
 			continue;
 		}
 
-		if (hdmi_support[i].mode == display->default_config) {
+		if (hdmi_support[i].mode == display->default_mode) {
 			fix = numbconfig;
 		}
 		numbconfig++;
@@ -1555,8 +1550,8 @@ loop:
 		all_support = 1;
 		goto loop;
 	}
-	/* +1 for temple use ,for example 3D or  other*/
-	display->displayConfigList = (DisplayConfig_t **)hwc_malloc(sizeof(DisplayConfig_t *) * numbconfig + 1);
+
+	display->displayConfigList = (DisplayConfig_t **)hwc_malloc(sizeof(DisplayConfig_t *) * numbconfig);
 
 	if (display->displayConfigList == NULL) {
 		ALOGE("initVariableHdmi malloc err...");
@@ -1585,20 +1580,17 @@ loop:
 	}
 
 	if (fix == -1)
-		fix = 0;/* 1'st is the default and the active config.see the up*/
-	display->activeConfigId = 0;/*fix;*/
+		fix = 0;// 1'st is the default and the active config.see the up
 	display->configNumber = numbconfig;
 
-	Configtemp = display->displayConfigList[0];
+	hwconfig = toHwConfig(display->displayConfigList[fix]);
+	ALOGD("disp:%d active:%d  mode:%d [%d x %d] maxid:%d", display->displayId, fix,
+		hwconfig->mode,display->displayConfigList[fix]->width,display->displayConfigList[fix]->height, numbconfig);
+	displayconfig = display->displayConfigList[0];
 	display->displayConfigList[0] = display->displayConfigList[fix];
-	display->displayConfigList[fix] = Configtemp;
-
-	hwconfig = toHwConfig(display->displayConfigList[0]);
-	ALOGD("disp:%d active:%d  mode:%d [%d x %d] maxid:%d", display->displayId, display->activeConfigId,
-		hwconfig->mode, display->displayConfigList[0]->width,display->displayConfigList[0]->height, numbconfig);
-
-	display->default_config = hwconfig->mode;
-
+	display->displayConfigList[fix] = displayconfig;
+	display->activeConfigId = 0;
+	display->default_mode = hwconfig->mode;
 	setActiveConfig(display, display->displayConfigList[0]);
 
 	return 0;
@@ -1615,6 +1607,7 @@ int de2Init(Display_t* display)
 	unsigned long arg[4] = {0};
 	long long deFreqtmp;
 	char state;
+	struct disp_output pricfg;
 
 	pthread_mutex_lock(&display->listMutex);
 
@@ -1644,17 +1637,20 @@ int de2Init(Display_t* display)
 	arg[0] = display->displayId;
 	arg[1] = (unsigned long)&hwdisplay->type;
 	ret = ioctl(dispFd, DISP_GET_OUTPUT, arg);
-	if (ret) {
-		ALOGE("display get display type err:%d...", ret);
-		return -1;
-	}
+	if (ret)
+		ALOGE("display get display type fail:%d...", ret);
 
 	if (display->displayId == 1) {
-		if (hdmifd > 0) {
-			lseek(hdmifd, 5, SEEK_SET);
-			read(hdmifd, &state, 1);
-			if (state == '1') {
-				hwdisplay->type.type = DISP_OUTPUT_TYPE_HDMI;
+		arg[0] = 0;
+		arg[1] = (unsigned long)&pricfg;
+		ioctl(dispFd, DISP_GET_OUTPUT, arg);
+		if (pricfg.type != DISP_OUTPUT_TYPE_HDMI) {
+			if (hdmifd > 0) {
+				lseek(hdmifd, 5, SEEK_SET);
+				read(hdmifd, &state, 1);
+				if (state == '1') {
+					hwdisplay->type.type = DISP_OUTPUT_TYPE_HDMI;
+				}
 			}
 		}
 	}
@@ -1700,6 +1696,54 @@ int de2Init(Display_t* display)
 	return 0;
 }
 
+static int clearAllLayers(Display_t *display)
+{
+	int ret = 0;
+	unsigned long arg[4] = {0};
+	unsigned int chn = display->displayId ? 2 : 4;
+	unsigned int ly = 4;
+	unsigned int i, j;
+
+	struct disp_layer_config2 layersSet[chn][ly];
+	memset(layersSet, 0, sizeof(layersSet));
+	for(i = 0; i < chn; i++) {
+		for(j = 0; j < ly; j++) {
+			layersSet[i][j].enable = false;
+			layersSet[i][j].channel = i;
+			layersSet[i][j].layer_id = j;
+		}
+	}
+	/* open protect. */
+	arg[0] = display->displayId;
+	arg[1] = 1;
+
+	ret = ioctl(dispFd, DISP_SHADOW_PROTECT, (unsigned long)arg);
+	if(ret != 0)
+	{
+		ALOGE("%d err: DISP_SHADOW_PROTECT failed", __LINE__);
+		return -1;
+	}
+
+	arg[1] = (unsigned long)(&layersSet[0][0]);
+	arg[2] = chn * ly;
+	ret = ioctl(dispFd, DISP_LAYER_SET_CONFIG2, (unsigned long)arg);
+	if(ret != 0)
+	{
+		ALOGE("%d err: DISP_LAYER_SET_CONFIG2 failed", __LINE__);
+		return -1;
+	}
+
+	arg[0] = display->displayId;
+	arg[1] = 0;
+	ret = ioctl(dispFd, DISP_SHADOW_PROTECT, (unsigned long)arg);
+	if(ret != 0)
+	{
+		ALOGE("%d err: DISP_SHADOW_PROTECT failed", __LINE__);
+		return -1;
+	}
+	return 0;
+}
+
 int de2Deinit(Display_t *display)
 {
 	DisplayPrivate_t *displayPri = NULL;
@@ -1711,6 +1755,8 @@ int de2Deinit(Display_t *display)
 	/* free the timeline */
 	display->plugIn = 0;
 	display->active = 0;
+
+	clearAllLayers(display);
 
 	pthread_mutex_lock(&display->listMutex);
 	while (display->configNumber--) {
@@ -1725,12 +1771,12 @@ int de2Deinit(Display_t *display)
 	pthread_mutex_unlock(&display->listMutex);
 
 	arg[0] = display->displayId;
-    arg[1] = HWC_DESTROY_CLIENT;
+	arg[1] = HWC_DESTROY_CLIENT;
 
 	if (ioctl(dispFd, DISP_HWC_COMMIT, (unsigned long)arg)) {
-        ALOGE("destroy a timeline %d !!!", display->displayId);
-    }
-    return 0;
+		ALOGE("destroy a timeline %d !!!", display->displayId);
+	}
+	return 0;
 }
 
 int32_t de2SetPowerMode(Display_t* display, int32_t mode)
@@ -1746,6 +1792,7 @@ int32_t de2SetPowerMode(Display_t* display, int32_t mode)
     case HWC2_POWER_MODE_OFF:
         arg[1] = 1;
         vsyncEn = 0;
+	clearAllLayers(display);
         break;
     case HWC2_POWER_MODE_DOZE:
     case HWC2_POWER_MODE_DOZE_SUSPEND:
@@ -1829,7 +1876,7 @@ int displayDeviceInit(Display_t ***display)
 	}
 
 	/* if we have LCD or other permanent, set it primer display */
-	dispArray = (Display_t **)calloc(DE_NUM,(sizeof(Display_t*)));
+	dispArray = (Display_t **)hwc_malloc(DE_NUM * (sizeof(Display_t*)));
 	if(dispArray == NULL) {
 		ALOGE("Alloc display err, Can not initial the hwc module.");
 		return -1;
@@ -1843,11 +1890,10 @@ int displayDeviceInit(Display_t ***display)
 			ALOGE("Alloc display err, Can not initial the hwc module.");
 			return -1;
 		}
-		memset(disp, 0, sizeof(Display_t) + sizeof(DisplayPrivate_t));
 		hwdisplay = toHwDisplay(disp);
 		disp->displayOpration = &sunxiDisplayOpr;
 		disp->displayId = i;
-		disp->default_config = DISP_TV_MOD_1080P_60HZ;
+		disp->default_mode = DISP_TV_MOD_1080P_60HZ;
 
 		arg[0] = i;
 		arg[1] = (unsigned long)&hwdisplay->type;
@@ -1858,15 +1904,15 @@ int displayDeviceInit(Display_t ***display)
 			ALOGV("get [Disp%d] output type is not NONE!\n", i);
 		if (hwdisplay->type.type == DISP_OUTPUT_TYPE_LCD) {
 			ALOGD("find Permanent display:%d", i);
-			fixdiplay = i;
+			fixdiplay = i + 1;
 		}
 		setDisplayName(disp);
 		DESource[i].fixPipeNumber = (i == 0 ? 4 : 2);
 		DESource[i].fixVideoPipeNum = 1;
 		DESource[i].currentPipe = 0;
 
-		DESource[i].layerInfo = (disp_layer_config2 *)calloc(DESource[i].fixPipeNumber * 4, sizeof(disp_layer_config2));
-		DESource[i].Pipe = (PipeInfo_t*)calloc(DESource[i].fixPipeNumber, sizeof(PipeInfo_t));
+		DESource[i].layerInfo = (disp_layer_config2 *)hwc_malloc(DESource[i].fixPipeNumber * 4 * sizeof(disp_layer_config2));
+		DESource[i].Pipe = (PipeInfo_t*)hwc_malloc(DESource[i].fixPipeNumber * sizeof(PipeInfo_t));
 
 		if (DESource[i].layerInfo == NULL
 				|| DESource[i].Pipe == NULL ) {
@@ -1875,9 +1921,6 @@ int displayDeviceInit(Display_t ***display)
 		}
 		list_init(&disp->layerSortedByZorder);
 		pthread_mutex_init(&disp->listMutex, 0);
-
-		memset(DESource[i].Pipe, 0, sizeof(PipeInfo_t) * DESource[i].fixPipeNumber);
-		memset(DESource[i].layerInfo, 0, sizeof(disp_layer_config2) * DESource[i].fixPipeNumber * 4);
 
 		for (j = 0; j < DESource[i].fixPipeNumber * 4; j++) {
 			DESource[i].layerInfo[j].channel = j / 4;

@@ -1311,10 +1311,6 @@ static int adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs)
     /* TODO: process other parameters settings */
     str_parms_destroy(parms);
     return 0;
-
-
-    return 0;
-
 }
 
 static char * adev_get_parameters(const struct audio_hw_device *dev,

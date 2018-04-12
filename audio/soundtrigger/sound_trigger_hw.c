@@ -346,11 +346,11 @@ void send_event_with_handle(sound_model_handle_t* model_handle_str,
                 return;
             }
 
-            struct sound_trigger_model_event *event;
+            struct sound_trigger_model_event *event = NULL;
             event = (struct sound_trigger_model_event *)data;
-            event->status = SOUND_MODEL_STATUS_UPDATED;
-            event->model = model_context->model_handle;
             if (event) {
+                event->status = SOUND_MODEL_STATUS_UPDATED;
+                event->model = model_context->model_handle;
                 model_context->model_callback(&event, model_context->model_cookie);
                 free(event);
             }

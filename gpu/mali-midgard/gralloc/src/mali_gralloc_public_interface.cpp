@@ -207,7 +207,7 @@ static int32_t mali_gralloc_allocate(gralloc1_device_t *device, uint32_t numDesc
 			 *
 			 * Explicitly ignore allocation errors since it is not critical to have
 			 */
-			(void)gralloc_buffer_attr_allocate(hnd);
+			(void)gralloc_buffer_attr_allocate(m, hnd);
 
 			hnd->req_format = format;
 			hnd->yuv_info = MALI_YUV_BT601_NARROW;

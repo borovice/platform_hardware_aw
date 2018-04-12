@@ -45,7 +45,7 @@ typedef struct attr_region attr_region;
  *
  * Return 0 on success.
  */
-int gralloc_buffer_attr_allocate(struct private_handle_t *hnd);
+int gralloc_buffer_attr_allocate(mali_gralloc_module *m, struct private_handle_t *hnd);
 
 /*
  * Frees the shared memory allocated for attribute storage.

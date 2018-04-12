@@ -76,7 +76,7 @@ static void power_set_interactive(struct power_module *module, int on)
     ALOGI("power_set_interactive: init success!!");
     if(!on || low_power_mode) {
         sysfs_write(ROOMAGE,ROOMAGE_SCREEN_OFF);
-    #if defined A83T || A33 || A63 || VR9
+    #if defined A83T || A33 || A63 || VR9 || A50
         sysfs_write(GPUCOMMAND,"0");
     #endif
         benchmark_mode = 0;
@@ -232,7 +232,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 if (data && launch_mode == 0) {
                     if (benchmark_mode == 1) {
                         benchmark_mode = 0;
-                    #if defined A83T || A33 || A63 || VR9
+                    #if defined A83T || A33 || A63 || VR9 || A50
                         sysfs_write(GPUCOMMAND,"0");
                     #endif
                     }
@@ -275,11 +275,11 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_NORMAL);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9
+            #if defined A83T || A33 || A63 || VR9 || A50
                 sysfs_write(GPUCOMMAND,"0");
             #endif
 
-            #if defined A64 || A63 || VR9
+            #if defined A64 || A63 || VR9 || A50
                 sysfs_write(DRAMPAUSE,"0");
             #endif
             break;
@@ -294,7 +294,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 //sysfs_write(CPU0LOCK,"1");
                 sysfs_write(CPU0GOV,INTERACTIVE_GOVERNOR);
                 sysfs_write(CPUHOT,"1");
-            #if defined A64 || A63 || VR9
+            #if defined A64 || A63 || VR9 || A50
                 sysfs_write(DRAMPAUSE,"0");
             #endif
                 break;
@@ -332,10 +332,10 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_PERF);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9
+            #if defined A83T || A33 || A63 || VR9 || A50
                 sysfs_write(GPUCOMMAND,"1");
             #endif
-            #if defined A64 || A63 || VR9
+            #if defined A64 || A63 || VR9 || A50
                 sysfs_write(DRAMPAUSE, "1");
             #endif
                 break;
@@ -361,11 +361,11 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_NORMAL);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9
+            #if defined A83T || A33 || A63 || VR9 || A50
                 sysfs_write(GPUCOMMAND,"0");
             #endif
 
-            #if defined A64 || A63 || VR9
+            #if defined A64 || A63 || VR9 || A50
                 sysfs_write(DRAMPAUSE,"0");
             #endif
                 break;
@@ -383,7 +383,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(DRAMSCEN,DRAM_BGMUSIC);
             #endif
 
-            #if defined A63 || VR9
+            #if defined A63 || VR9 || A50
  //               sysfs_write(DRAMPAUSE,"0");
             #endif
 
@@ -391,14 +391,14 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_NORMAL);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9
+            #if defined A83T || A33 || A63 || VR9 || A50
                 sysfs_write(GPUCOMMAND,"0");
             #endif
 
                 break;
             case POWER_HINT_DISABLE_TOUCH:
                 ALOGI("==DISABLE TOUCH==");
-            #if defined A64 || A63 || VR9
+            #if defined A64 || A63 || VR9 || A50
                 if (data == NULL) {
                     ALOGW("Wrong parameters to control touchscreen runtime suspend!!!");
                     return;

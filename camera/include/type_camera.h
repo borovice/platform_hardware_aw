@@ -2,6 +2,8 @@
 #ifndef __LIB__CAMERA__TYPE__H__
 #define __LIB__CAMERA__TYPE__H__
 
+#include<mutex>
+
 typedef struct PREVIEWINFO_t
 {
     int left;
@@ -36,6 +38,7 @@ typedef struct V4L2BUF_t
     RECT_t            thumb_crop_rect;
     int             thumbFormat;
 
+    std::mutex refMutex;     // the mutex for refCnt 
     int             refCnt;         // used for releasing this frame
     unsigned int    bytesused;      // used by compressed source
     int             nDmaBufFd;      //dma fd callback to codec

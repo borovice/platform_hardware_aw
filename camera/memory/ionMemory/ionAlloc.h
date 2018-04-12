@@ -33,13 +33,6 @@
 #include "memory/ionMemory/ionAllocEntry.h"
 #include "memory/sc_interface.h"
 
-
-#ifdef __A64__
-
-#define USE_IOMMU
-
-#endif
-
 #define DEBUG_ION_REF  0   //just for H3 ION memery info debug
 
 #define SZ_64M        0x04000000

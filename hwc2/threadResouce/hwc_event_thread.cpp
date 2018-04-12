@@ -284,8 +284,11 @@ hotplugUeventParse(eventThreadContext_t *context, const char *msg)
 			switch_name[length] = 0;
 			for (int i = 0; i < context->numberDisplay; i++) {
 				display = context->display[i];
-				if (!strcmp(display->displayName, switch_name))
-					match = 1;
+
+				if (strcmp(context->display[0]->displayName, "hdmi")) {
+					if (!strcmp(display->displayName, switch_name))
+						match = 1;
+				}
 			}
 			if (match) {
 				lseek(hdmifd, 5, SEEK_SET);
@@ -306,7 +309,7 @@ static void *eventThreadLoop(void *user)
 	int recvlen = 0;
 	char msg[UEVENT_MSG_LEN + 2];
 	char state;
-	Display_t *display;
+	Display_t *display = NULL;
 	struct epoll_event eventItems[EPOLL_COUNT];
 	int eventCount;
 
@@ -317,6 +320,7 @@ static void *eventThreadLoop(void *user)
 		hdmifd = open("/sys/class/extcon/hdmi/state", O_RDONLY);
 		if (hdmifd < 0) {
 			ALOGE("open hdmi state err %d...", hdmifd);
+			goto init_epoll;
 		}
 		lseek(hdmifd, 5, SEEK_SET);
 		read(hdmifd, &state, 1);
@@ -324,10 +328,14 @@ static void *eventThreadLoop(void *user)
 		if (state == '1')
 			for (int i = 0; i < context->numberDisplay; i++) {
 				display = context->display[i];
-				if (!strcmp(display->displayName, "hdmi"))
-					callHotplug(context, display, state == '1'? 1 : 0);
+				if (strcmp(context->display[0]->displayName, "hdmi")) {
+					if (!strcmp(display->displayName, "hdmi"))
+						callHotplug(context, display, state == '1'? 1 : 0);
+				}
 			}
 	}
+
+init_epoll:
 	context->epoll_fd = epoll_create(EPOLL_COUNT);
 
 	ueventfd = uevent_open_socket(64*1024, true);
@@ -373,20 +381,27 @@ static void *eventThreadLoop(void *user)
 					== sizeof(cmd_esg)) {
 					switch(cmd_esg.cmd) {
 						case 1:// switch hdmi mode
-							ALOGD("change hdmi[%d] mode[%d] from user",cmd_esg.disp, cmd_esg.data);
-							if (display->default_config != cmd_esg.data) {
-								callHotplug(context, context->display[cmd_esg.disp], 0);
-								display->default_config = cmd_esg.data;
-								callHotplug(context, context->display[cmd_esg.disp], 1);
-							}
+							ALOGD("chang hdmi[%d] mode[%d] from user",cmd_esg.disp, cmd_esg.data);
+							if (cmd_esg.disp != 1 ||
+								context->display[cmd_esg.disp]->default_mode == cmd_esg.data)
+								break;
+							callHotplug(context, context->display[cmd_esg.disp], 0);
+							context->display[cmd_esg.disp]->default_mode = cmd_esg.data;
+
+							callHotplug(context, context->display[cmd_esg.disp], 1);
 						break;
-						case 2://3D
+					case 2://3D
+						if (((enum display_3d_mode)cmd_esg.data != DISPLAY_3D_LEFT_RIGHT_HDMI) &&
+								((enum display_3d_mode)cmd_esg.data != DISPLAY_3D_TOP_BOTTOM_HDMI))
+							switchDisplay(context->display[1],
+								DISP_OUTPUT_TYPE_HDMI, DISP_TV_MOD_1080P_60HZ);
+						else
 							switchDisplay(context->display[1],
 									DISP_OUTPUT_TYPE_HDMI, DISP_TV_MOD_1080P_24HZ_3D_FP);
 
-							display->default_config = DISP_TV_MOD_1080P_24HZ_3D_FP;
-							hdmi_3D_mode = (enum display_3d_mode)cmd_esg.data;
+						hdmi_3D_mode = (enum display_3d_mode)cmd_esg.data;
 						break;
+
 						default:
 							ALOGD("not a right mesg");
 					}
