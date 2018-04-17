@@ -15,6 +15,7 @@
  */
 
 #include "hwc.h"
+#include <hardware/sunxi_metadata_def.h>
 
 bool regionCrossed(hwc_rect_t *rect0, hwc_rect_t *rect1, hwc_rect_t *rectx)
 {
@@ -99,6 +100,14 @@ bool layerIsVideo(Layer_t *layer)
 	case HAL_PIXEL_FORMAT_YV12:
 	case HAL_PIXEL_FORMAT_YCrCb_420_SP:
 	case HAL_PIXEL_FORMAT_AW_NV12:
+#if (DE_VERSION == 30)
+	case HAL_PIXEL_FORMAT_AW_YV12_10bit:
+	case HAL_PIXEL_FORMAT_AW_I420_10bit:
+	case HAL_PIXEL_FORMAT_AW_NV21_10bit:
+	case HAL_PIXEL_FORMAT_AW_NV12_10bit:
+	case HAL_PIXEL_FORMAT_AW_P010_UV:
+	case HAL_PIXEL_FORMAT_AW_P010_VU:
+#endif
 		return true;
 	default:
 		return false;
@@ -121,6 +130,22 @@ bool isSameForamt(Layer_t *layer1, Layer_t *layer2)
 		return false;
 	}
     return true;
+}
+
+int is_afbc_buf(buffer_handle_t handle)
+{
+	if (NULL != handle) {
+#if GRALLOC_SUNXI_METADATA_BUF
+		private_handle_t *hdl = (private_handle_t *)handle;
+		int metadata_fd = hdl->metadata_fd;
+		unsigned int flag = hdl->ion_metadata_flag;
+		if ((0 <= metadata_fd)
+				&& (flag & SUNXI_METADATA_FLAG_AFBC_HEADER)) {
+			return 1;
+		}
+#endif
+	}
+	return 0;
 }
 
 bool checkDealContiMem(Layer_t *layer)

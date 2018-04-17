@@ -889,16 +889,16 @@ int32_t hwc_set_layer_composition_type(hwc2_device_t* device, hwc2_display_t dis
 int32_t hwc_set_layer_dataspace(hwc2_device_t* device, hwc2_display_t display,
     hwc2_layer_t layer, int32_t dataspace)
 {
-    Layer_t *ly = (Layer*) layer;
+	Layer_t *ly = (Layer_t *) layer;
 	unusedpara(device);
 
-    if(!findDisplay(display)){
-        ALOGE("%s : bad display %p", __FUNCTION__, (void*)display);
-        return HWC2_ERROR_BAD_DISPLAY;
-    }
+	if(!findDisplay(display)){
+		ALOGE("%s : bad display %p", __FUNCTION__, (void*)display);
+		return HWC2_ERROR_BAD_DISPLAY;
+	}
 
-    ly->dataspace = dataspace;
-    return HWC2_ERROR_NONE;
+	ly->dataspace = dataspace;
+	return HWC2_ERROR_NONE;
 }
 
 int32_t hwc_set_layer_display_frame(hwc2_device_t* device, hwc2_display_t display,
@@ -912,7 +912,7 @@ int32_t hwc_set_layer_display_frame(hwc2_device_t* device, hwc2_display_t displa
         return HWC2_ERROR_BAD_DISPLAY;
     }
 
-    ly->frame = frame;	
+    ly->frame = frame;
     return HWC2_ERROR_NONE;
 }
 
@@ -1034,6 +1034,33 @@ int hwc_set_3d_mode(int display, int mode)
 	return write(socketpair_fd[0],&mesg, sizeof(mesg)) == sizeof(mesg);
 }
 
+int hwc_setMargin(int display, int hpercent, int vpercent);
+int hwc_setVideoRatio(int display, int radioType);
+
+int hwc_set_margin(int display, int data)
+{
+	int hpercent, vpercent;
+	hpercent = (data & 0xffff0000) >> 16;
+	vpercent = data & 0xffff;
+
+	hwc_setMargin(display, hpercent, vpercent);
+	return 0;
+}
+
+int hwc_set_screenfull(int display, int enable)
+{
+#if 0
+	Display_t **dp = mDisplay;
+
+	for(int i = 0; i < numberDisplay; i++) {
+		if (dp[i]->displayId == display)
+			dp[i]->ScreenFull = enable;
+	}
+#endif
+	display, enable;
+	return 0;
+}
+
 /* hwc_set_display_command
   *  this is HIDL call for set display arg,
   *
@@ -1059,10 +1086,160 @@ int hwc_set_display_command(int display, int cmd1, int cmd2, int data)
 	case HIDL_SET3D_MODE:
 		ret = hwc_set_3d_mode(display, cmd2);
 	break;
+	case HIDL_SETMARGIN:
+		ret = hwc_set_margin(display, data);
+	break;
+	case HIDL_SETVIDEORATIO:
+		ret = hwc_set_screenfull(display, data);
+	break;
 	default:
 		ALOGD("give us a err cmd");
 	}
 	return ret;
+}
+
+int hwc_setDataSpacemode(int display, int dataspace_mode)
+{
+	Display_t **dp = mDisplay;
+	for (int i = 0; i < numberDisplay; i++) {
+		if (dp[i]->displayId == display)
+			dp[i]->dataspace_mode = dataspace_mode;
+	}
+	return 0;
+}
+
+int hwc_callback_DataSpacemode(int display, int dataspace_mode)
+{
+	unusedpara(display);
+	unusedpara(dataspace_mode);
+	return 0;
+}
+
+int hwc_setSwitchdevice(int display)
+{
+	unusedpara(display);
+	return 0;
+}
+
+/* API for H6 */
+int hwc_setHotplug(int display, int enable)
+{
+	Display_t **dp = mDisplay;
+	for (int i = 0; i < numberDisplay; i++) {
+		if (dp[i]->displayId == display)
+			dp[i]->plugIn = enable;
+	}
+
+	return 0;
+}
+
+int hwc_setBlank(int display)
+{
+	int ret;
+	ret = clearAllLayers(display);
+	if (ret)
+		ALOGE("Clear all layers failed!");
+	return 0;
+}
+
+tv_para_t tv_mode[]=
+{
+	/* 1'st is default */
+	{DISP_TV_MOD_1080P_60HZ,       1920,   1080, 60, 0},
+	{DISP_TV_MOD_720P_60HZ,        1280,   720,  60, 0},
+
+	{DISP_TV_MOD_480I,             720,    480, 60, 0},
+	{DISP_TV_MOD_576I,             720,    576, 60, 0},
+	{DISP_TV_MOD_480P,             720,    480, 60, 0},
+	{DISP_TV_MOD_576P,             720,    576, 60, 0},
+	{DISP_TV_MOD_720P_50HZ,        1280,   720, 50, 0},
+
+	{DISP_TV_MOD_1080P_24HZ,       1920,   1080, 24, 0},
+	{DISP_TV_MOD_1080P_50HZ,       1920,   1080, 50, 0},
+
+	{DISP_TV_MOD_1080I_50HZ,       1920,   1080, 50, 0},
+	{DISP_TV_MOD_1080I_60HZ,       1920,   1080, 60, 0},
+	{DISP_TV_MOD_3840_2160P_25HZ,  3840,   2160, 25, 0},
+	{DISP_TV_MOD_3840_2160P_24HZ,  3840,   2160, 24, 0},
+	{DISP_TV_MOD_3840_2160P_30HZ,  3840,   2160, 30, 0},
+	{DISP_TV_MOD_4096_2160P_24HZ,  4096,   2160, 24, 0},
+	{DISP_TV_MOD_4096_2160P_25HZ,  4096,   2160, 25, 0},
+	{DISP_TV_MOD_4096_2160P_30HZ,  4096,   2160, 30, 0},
+	{DISP_TV_MOD_3840_2160P_60HZ,  3840,   2160, 60, 0},
+	{DISP_TV_MOD_4096_2160P_60HZ,  4096,   2160, 60, 0},
+	{DISP_TV_MOD_1080P_24HZ_3D_FP, 1920,   1080, 24, 0},
+	{DISP_TV_MOD_720P_50HZ_3D_FP,  1280,   720, 50, 0},
+	{DISP_TV_MOD_720P_60HZ_3D_FP,  1280,   720, 60, 0},
+};
+int hwc_setOutputMode(int display, int type, int mode)
+{
+	Display_t **dp = mDisplay;
+	DisplayConfigPrivate_t *hwconfig;
+	DisplayConfig_t *dispconfig;
+	int i, num;
+	int ScreenWidth, ScreenHeight;
+
+	if (type == DISP_OUTPUT_TYPE_HDMI) {
+		num = sizeof(tv_mode)/sizeof(tv_mode[0]);
+		for (i = 0; i < num; i++) {
+			if (tv_mode[i].mode == mode) {
+				ScreenWidth = tv_mode[i].width;
+				ScreenHeight = tv_mode[i].height;
+			}
+		}
+	}
+
+	for (int i = 0; i < numberDisplay; i++) {
+		if (dp[i]->displayId == display) {
+			dp[i]->VarDisplayWidth = ScreenWidth;
+			dp[i]->VarDisplayHeight = ScreenHeight;
+		}
+	}
+#if 0
+	for (int i = 0; i < numberDisplay; i++) {
+		if (dp[i]->displayId == display) {
+			dispconfig = dp[i]->displayConfigList[dp[i]->activeConfigId];
+			hwconfig = (DisplayConfigPrivate_t*)dispconfig->data;
+			hwconfig->screenDisplay.left = 0;
+			hwconfig->screenDisplay.right = ScreenWidth;
+			hwconfig->screenDisplay.top = 0;
+			hwconfig->screenDisplay.bottom = ScreenHeight;
+		}
+	}
+#endif
+	return 0;
+}
+
+int hwc_setMargin(int display, int hpercent, int vpercent)
+{
+	Display_t **dp = mDisplay;
+	for (int i = 0; i < numberDisplay; i++) {
+		if (dp[i]->displayId == display) {
+			dp[i]->hpercent = hpercent;
+			dp[i]->vpercent = vpercent;
+		}
+	}
+	return 0;
+}
+
+int hwc_setVideoRatio(int display, int radioType)
+{
+	Display_t **dp = mDisplay;
+
+	switch(radioType)
+	{
+		case SCREEN_AUTO:
+		case SCREEN_FULL:
+			for(int i = 0; i < numberDisplay; i++)
+			{
+				if (dp[i]->displayId == display)
+					dp[i]->screenRadio = radioType;
+			}
+			break;
+		default:
+			break;
+	}
+	return 0;
 }
 
 /* hwc_device_getFunction(..., descriptor)

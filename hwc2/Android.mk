@@ -39,6 +39,11 @@ ifeq ($(USE_IOMMU),true)
 	LOCAL_CFLAGS += -DUSE_IOMMU
 endif
 
+ifeq ($(TARGET_USES_DE30),true)
+	LOCAL_CFLAGS += -DDE_VERSION=30
+	LOCAL_CFLAGS += -DGRALLOC_SUNXI_METADATA_BUF
+endif
+
 LOCAL_SHARED_LIBRARIES := \
     libutils \
     libEGL \

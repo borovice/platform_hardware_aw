@@ -68,6 +68,19 @@ enum HIDL_set_cmd {
 	HIDL_SML_MODE_CMD,
 	HIDL_COLOR_TEMPERATURE_CMD,
 	HIDL_SET3D_MODE,
+	HIDL_SETMARGIN,
+	HIDL_SETVIDEORATIO,
+};
+
+enum RatioType {
+	SCREEN_AUTO,
+	SCREEN_FULL,
+};
+
+enum DataSpace_cmd {
+	DISPLAY_OUTPUT_DATASPACE_MODE_AUTO,
+	DISPLAY_OUTPUT_DATASPACE_MODE_HDR,
+	DISPLAY_OUTPUT_DATASPACE_MODE_SDR,
 };
 
 enum sunnxi_dueto_flags{
@@ -161,6 +174,20 @@ typedef struct DisplayConfig{
 	int data[0];
 }DisplayConfig_t;
 
+typedef struct DisplayConfigPrivate {
+	hwc_rect_t screenDisplay;
+	disp_tv_mode mode;
+}DisplayConfigPrivate_t;
+
+typedef struct
+{
+	disp_tv_mode    mode;
+	int             width;
+	int             height;
+	int             refreshRate;
+	bool support;
+}tv_para_t;
+
 typedef struct sunxiDisplay Display_t;
 typedef struct DisplayOpr DisplayOpr_t;
 typedef struct LayerSubmit LayerSubmit_t;
@@ -201,6 +228,12 @@ typedef struct sunxiDisplay{
 	DisplayOpr_t *displayOpration;
 	submitThread_t *commitThread;
 	int retirfence;
+	int VarDisplayWidth;
+	int VarDisplayHeight;
+	int hpercent;
+	int vpercent;
+	int screenRadio;
+	int dataspace_mode;
 	int data[0];
 }Display_t;
 
@@ -406,6 +439,7 @@ extern int submitLayerToDisplay(Display_t *disp, LayerSubmit_t *submitLayer);
 extern bool checkSwWrite(Layer_t *layer);
 
 extern bool layerIsVideo(Layer_t *layer);
+extern int is_afbc_buf(buffer_handle_t handle);
 extern bool checkSoildLayer(Layer_t *layer);
 extern bool layerIsScale(Display_t *display, Layer_t *layer);
 extern bool checkDealContiMem(Layer_t *layer);
@@ -424,6 +458,7 @@ extern void deinitSubmitTread(Display_t *disp);
 extern void callRefresh(Display_t *display);
 extern int submitTransformLayer(Layer_t *layer);
 
+extern int clearAllLayers(int displayId);
 extern int displayDeviceDeInit(Display_t **display);
 /* ION */
 extern int Iondeviceinit(void);
@@ -431,6 +466,7 @@ extern int IondeviceDeinit(void);
 extern int ionAllocBuffer(int size, bool mustconfig, bool is_secure);
 extern unsigned int ionGetPhyAddress(int sharefd);
 extern void syncLayerBuffer(Layer_t *layer);
+extern unsigned int ionGetMetadataFlag(buffer_handle_t handle);
 
 /* For debug */
 extern void debugInit(int num);
@@ -448,6 +484,13 @@ extern int hwc_set_enhance_mode(int display, int cmd2, int data);
 extern int hwc_set_smt_backlight(int dispId, int mode);
 /* For Color Tempreture */
 extern int hwc_set_color_temperature(int display, int cmd2, int data);
+/* For displayD */
+extern int hwc_setDataSpacemode(int display, int dataspace_mode);
+extern int hwc_setBlank(int display);
+extern int hwc_setOutputMode(int display, int type, int mode);
+extern int hwc_setMargin(int display, int hpercent, int vpercent);
+extern int hwc_setVideoRatio(int display, int radioType);
+
 /* memctrl */
 extern void memCtrlInit(Display_t **display, int num);
 extern void memContrlComplet(Display_t *display);

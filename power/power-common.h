@@ -49,5 +49,6 @@
 #define  POWER_HINT_BG_MUSIC      0x00000040
 #define  POWER_HINT_HOME          0x00000050
 #define  POWER_TOUCH              0x00000060
+#define  POWER_ROTATION           0x00000070
 #define  INTERACTIVE_GOVERNOR     "interactive"
 

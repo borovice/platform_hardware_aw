@@ -356,13 +356,18 @@ void PreviewWindow::stopPreview()
  *              dequeue_buffer index
  *              if can not dequeue buffer,return -1
  */
-int PreviewWindow::onNextFrameAvailable2(int index)
+int PreviewWindow::onNextFrameAvailable2(int index, RECT_t preview_crop)
 {
     F_LOG;
     Mutex::Autolock locker(&mObjectLock);
     int err = NO_ERROR;
     int dequeuedIdx = -1;
 
+    mPreviewWindow->set_crop(mPreviewWindow,
+                            preview_crop.left,
+                            preview_crop.top,
+                            preview_crop.left + preview_crop.width,
+                            preview_crop.top + preview_crop.height);
     err = unlockBuffer(index);
     if(err != NO_ERROR)
     {

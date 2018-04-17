@@ -9,6 +9,8 @@
 #include "IHWCPrivateService.h"
 #include "IDisplaydCallback.h"
 
+#include "../hwc.h"
+
 class Hwcps: public android::BnHWCPrivateService {
 public:
     static Hwcps *instantiate();
@@ -60,18 +62,21 @@ int Hwcps::switchDevice(const DeviceTable& tables) {
 int Hwcps::setOutputMode(int display, int type, int mode) {
     ALOGD("setOutputMode: display[%d] type=%d mode=%d",
           display, type, mode);
+    hwc_setOutputMode(display, type, mode);
     return 0;
 }
 
 int Hwcps::setMargin(int display, int l, int r, int t, int b) {
     ALOGD("setMargin: display[%d] l=%d r=%d t=%d b=%d",
           display, l, r, t, b);
+	hwc_setMargin(display, r, b);
     return 0;
 }
 
 int Hwcps::setVideoRatio(int display, int ratio) {
     ALOGD("setVideoRatio: display[%d], ratio=%d",
           display, ratio);
+	hwc_setVideoRatio(display, ratio);
     return 0;
 }
 
@@ -84,6 +89,7 @@ int Hwcps::set3DMode(int display, int mode) {
 int Hwcps::setDataspace(int display, int dataspace) {
     ALOGD("setDataspace: display[%d], dataspace=%d",
           display, dataspace);
+	hwc_setDataSpacemode(display, dataspace);
     return 0;
 }
 

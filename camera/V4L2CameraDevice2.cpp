@@ -1460,7 +1460,7 @@ bool V4L2CameraDevice::previewThread()
     //else {
 #endif
     mCallbackNotifier->onNextFrameAvailable(mPreviewWindow->mBufferHandle[pbuf->index],(void*)pbuf,pbuf->index);
-    releasebufferindex = mPreviewWindow->onNextFrameAvailable2(pbuf->index);
+    releasebufferindex = mPreviewWindow->onNextFrameAvailable2(pbuf->index, pbuf->crop_rect);
 
     if(releasebufferindex >= 0){
         releasePreviewFrame(releasebufferindex);

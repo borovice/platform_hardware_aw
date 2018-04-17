@@ -104,7 +104,7 @@ public:
      */
     bool onNextFrameAvailable(const void* frame);
 
-    int onNextFrameAvailable2(int index);
+    int onNextFrameAvailable2(int index, RECT_t preview_crop);
 
     /***************************************************************************
      * Private API

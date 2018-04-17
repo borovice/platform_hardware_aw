@@ -83,7 +83,7 @@ int gralloc_buffer_attr_allocate(mali_gralloc_module *m, private_handle_t *hnd)
 	hnd->attr_base = (unsigned char*)mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, hnd->share_attr_fd, 0);
 	if (MAP_FAILED == hnd->attr_base)
 	{
-		AERR("ion_map metadata buffer from ion client %d failed", m->ion_client);
+		AERR("mmap metadata buffer from ion client %d failed", m->ion_client);
 		if (0 != ion_free(m->ion_client, ion_hnd))
 			AERR( "ion_free from ion client %d failed", m->ion_client);
 		close(hnd->share_attr_fd);
@@ -128,13 +128,6 @@ int gralloc_buffer_attr_free(private_handle_t *hnd)
 	{
 		ALOGE("Shared attribute region not avail to free");
 		goto out;
-	}
-
-	if (hnd->attr_base != MAP_FAILED)
-	{
-		ALOGW("Warning shared attribute region mapped at free. Unmapping");
-		munmap(hnd->attr_base, PAGE_SIZE);
-		hnd->attr_base = MAP_FAILED;
 	}
 
 	close(hnd->share_attr_fd);

@@ -4055,7 +4055,7 @@ static int adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs)
     struct sunxi_audio_device *adev = (struct sunxi_audio_device *)dev;
     struct str_parms *parms;
     char *str;
-    char value[32];
+    char value[128];
     int ret;
 
     ALOGV("adev_set_parameters, %s", kvpairs);
@@ -4111,6 +4111,27 @@ static int adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs)
     {
         ALOGV("in AUDIO_PARAMETER_DEVICES_IN_ACTIVE: %s", value);
         set_audio_devices_active(adev, AUDIO_IN, value);
+    }
+
+    // set audio out device
+    ret = str_parms_get_str(parms, AUDIO_PARAMETER_DEVICES_OUT_ACTIVE, value, sizeof(value));
+    if (ret >= 0)
+    {
+        ALOGV("out AUDIO_PARAMETER_DEVICES_OUT_ACTIVE: %s", value);
+
+        pthread_mutex_lock(&adev->lock);
+
+        if (adev->raw_flag == true)
+        {
+            ALOGW("in raw mode, should not set other audio out devices");
+            pthread_mutex_unlock(&adev->lock);
+            return -1;
+        }
+        set_audio_devices_active(adev, AUDIO_OUT, value);
+        //strcpy(adev->out_device_active_req, value);
+        force_all_standby(adev);
+        select_output_device(adev);
+        pthread_mutex_unlock(&adev->lock);
     }
 
     ret = str_parms_get_str(parms, "screen_state", value, sizeof(value));

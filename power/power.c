@@ -118,16 +118,6 @@ static int get_voter_list(struct power_module *module, size_t *voter) {
 
 static void power_hint(struct power_module *module, power_hint_t hint,
                        void *data) {
-                       //ALOGD("LAUNCH HINT:%x", hint);
-    property_get("sys.p_debug",propdebug,"");
-    //ALOGD("LAUNCH HINT:%s", propdebug);
-    if(!strcmp(propdebug,"true")) {
-        ALOGD("LAUNCH HINT:propdebug");
-        ALOGI("ScenseControl debug mode,scense would not change automatically!");
-        return ;
-    } else if(!strcmp(propdebug,"false")) {
-    //ALOGD("LAUNCH HINTelse:%x", hint);
-     //ALOGD("LAUNCH HINTelse:else");
         switch (hint) {
             case POWER_HINT_VSYNC:
                  //ALOGD("LAUNCH HINT:POWER_HINT_VSYNC");
@@ -136,29 +126,15 @@ static void power_hint(struct power_module *module, power_hint_t hint,
             case POWER_HINT_INTERACTION:
                 ALOGD("LAUNCH HINT:POWER_HINT_INTERACTION");
                 break;
-            /*
-            case POWER_TOUCH:
-			ALOGI("==POWER_TOUCH MODE==");
-                if (sustained_performance_mode || vr_mode || music_mode||benchmark_mode) {
-					ALOGI("==POWER_TOUCH MODE RETURN1==");
-                    return;
-                }
-                if (!data) {
-					ALOGI("==POWER_TOUCH ROOMAGE_LAUNCH==");
-                    sysfs_write(ROOMAGE,ROOMAGE_LAUNCH);
-                } else {
-                    if (launch_mode||benchmark_mode) {
-						ALOGI("==POWER_TOUCH MODE RETURN2==");
-                        return ;
-                    }
-                    sysfs_write(ROOMAGE,ROOMAGE_NORMAL);
-                }
+
+            case POWER_ROTATION:
+                ALOGI("==ROTATION MODE==");
+                sysfs_write(ROOMAGE,ROOMAGE_LAUNCH);
                 break;
-             */
+
             case POWER_HINT_LOW_POWER:
                 ALOGD("LAUNCH HINT:POWER_HINT_LOW_POWER");
                 break;
-
             /* Sustained performance mode:
                       * All CPUs are capped to ~0.8GHz
                       */
@@ -224,7 +200,6 @@ static void power_hint(struct power_module *module, power_hint_t hint,
 
             case POWER_HINT_LAUNCH:
             {
-                ALOGD("LAUNCH HINT:POWER_HINT_LAUNCH");
                 if (sustained_performance_mode || vr_mode || music_mode) {
                     return;
                 }
@@ -239,7 +214,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                     launch_mode = 1;
                     sysfs_write(ROOMAGE,ROOMAGE_LAUNCH);
 
-                    ALOGI("Activity launch hint handled");
+                    ALOGI("==LAUNCH MODE==");
                 } else if (data == NULL && launch_mode == 1) {
                     if (benchmark_mode == 1) {
                         launch_mode = 0;
@@ -248,17 +223,12 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                     }
                     launch_mode = 0;
                     sysfs_write(ROOMAGE,ROOMAGE_NORMAL);
-                    ALOGI("Activity launch normal");
+                    ALOGI("==LAUNCH_NORMAL MODE==");
                 }
             }
             break;
 
             case POWER_HINT_HOME:
-                /*property_get("sys.p_home",propdebug,"false");
-                if(!strcmp(propdebug,"false")) {
-                    return ;
-                }*/
-                ALOGD("LAUNCH HINT:POWER_HINT_HOME");
                 if (sustained_performance_mode || vr_mode) {
                     return;
                 }
@@ -285,11 +255,6 @@ static void power_hint(struct power_module *module, power_hint_t hint,
             break;
 
             case POWER_HINT_BOOTCOMPLETE:
-                ALOGD("LAUNCH HINT:POWER_HINT_BOOTCOMPLETE ");
-                property_get("sys.p_bootcomplete",propdebug,"false");
-                if(!strcmp(propdebug,"false")) {
-                    return ;
-                }
                 ALOGI("==BOOTCOMPLETE MODE==");
                 //sysfs_write(CPU0LOCK,"1");
                 sysfs_write(CPU0GOV,INTERACTIVE_GOVERNOR);
@@ -299,14 +264,6 @@ static void power_hint(struct power_module *module, power_hint_t hint,
             #endif
                 break;
             case POWER_HINT_BENCHMARK:
-                ALOGD("LAUNCH HINT:POWER_HINT_BENCHMARK");
-                property_get("sys.p_benchmark",propdebug,"false");
-
-                if(!strcmp(propdebug,"false")) {
-                    ALOGD("LAUNCH HINT:propdebug=false");
-                    return ;
-                }
-
                 if(data==NULL) {
                     ALOGD("LAUNCH HINT:data==NULL");
                     return;
@@ -340,12 +297,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
             #endif
                 break;
             case POWER_HINT_NORMAL:
-                /*property_get("sys.p_normal",propdebug,"false");
-                if(!strcmp(propdebug,"false")) {
-                    return ;
-                }*/
-                ALOGD("LAUNCH HINT:POWER_HINT_NORMAL");
-                if (sustained_performance_mode || vr_mode ||benchmark_mode|| launch_mode) {
+                if (sustained_performance_mode || vr_mode ||benchmark_mode) {
                     return;
                 }
                 benchmark_mode = 0;
@@ -370,11 +322,6 @@ static void power_hint(struct power_module *module, power_hint_t hint,
             #endif
                 break;
             case POWER_HINT_BG_MUSIC:
-                ALOGD("LAUNCH HINT:POWER_HINT_BG_MUSIC");
-                property_get("sys.p_music",propdebug,"false");
-                if(!strcmp(propdebug,"false")) {
-                    return ;
-                }
                 benchmark_mode = 0;
                 music_mode = 1;
                 ALOGI("==MUSIC MODE==");
@@ -410,13 +357,11 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(TP_SUSPEND, tp_state);
                 ALOGI("==Touchscreen runtime suspend %s !", state == 1 ? "ON" : "OFF");
              #endif
-
                 break;
             default:
                 ALOGD("LAUNCH HINT:default");
                 break;
            }
-       }
 }
 
 static struct hw_module_methods_t power_module_methods = {

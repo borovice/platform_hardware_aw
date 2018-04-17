@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "../hwc.h"
+#include <hardware/sunxi_metadata_def.h>
 
 #define ION_IOC_SUNXI_PHYS_ADDR 7
 int ionfd = -1;
@@ -114,3 +115,66 @@ int ionAllocBuffer(int size, bool mustconfig, bool is_secure)
 	return ret;
 }
 
+#if (GRALLOC_SUNXI_METADATA_BUF & (DE_VERSION == 30))
+unsigned int ionGetMetadataFlag(buffer_handle_t handle)
+{
+    if (NULL != handle) {
+        private_handle_t *hdl = (private_handle_t *)handle;
+        int ret = 0;
+        ion_user_handle_t ion_handle;
+        unsigned char *map_ptr = NULL;
+        int map_fd = -1;
+        unsigned int flag = 0;
+
+        if (0 == hdl->ion_metadata_size) {
+            ALOGW("ion_metadata_size is 0");
+            return 0;
+        }
+
+        ret = ion_import(ionfd, hdl->metadata_fd, &ion_handle);
+        if (ret) {
+            ALOGD("ion import failed, ret=%d, metadata_fd=%d!",
+                  ret, hdl->metadata_fd);
+            return 0;
+        }
+        ret = ion_map(ionfd, ion_handle, hdl->ion_metadata_size,
+                      PROT_READ, MAP_SHARED, 0, &map_ptr, &map_fd);
+        if (ret) {
+            ALOGE("ion_map failed, ret=%d\n", ret);
+            if (0 <= map_fd)
+                close(map_fd);
+            ion_free(ionfd, ion_handle);
+            return 0;
+        }
+
+        struct sunxi_metadata *ptr = (struct sunxi_metadata *)map_ptr;
+        flag = ptr->flag;
+
+        /*
+        struct afbc_header *p = &(ptr->afbc_head);
+        ALOGD("&&&&& afbc header:");
+           ALOGD("%u,%u,%u,%u;\n"
+           "%u,%u,%u,%u;\n"
+           "%u,%u,%u,%u;\n"
+           "%u,%u,%u,%u\n"
+           "%u,%u,%u @@@.",
+           p->signature, p->filehdr_size, p->version, p->body_size,
+           p->ncomponents, p->header_layout, p->yuv_transform, p->block_split,
+           p->inputbits[0], p->inputbits[1], p->inputbits[2], p->inputbits[3],
+           p->block_width, p->block_height, p->width, p->height,
+           p->left_crop, p->top_crop, p->block_layout);
+           */
+
+        ret = munmap(map_ptr, hdl->ion_metadata_size);
+        if (0 != ret) {
+            ALOGD("munmap sunxi metadata failed ! ret=%d", ret);
+        }
+        close(map_fd);
+        ion_free(ionfd, ion_handle);
+        return (flag & SUNXI_METADATA_FLAG_AFBC_HEADER);
+    } else {
+        ALOGE("%s,%d", __FUNCTION__, __LINE__);
+    }
+    return 0;
+}
+#endif

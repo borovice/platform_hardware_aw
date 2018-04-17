@@ -33,6 +33,10 @@
 #include <cutils/properties.h>
 #include <math.h>
 
+#ifdef HOMLET_PLATFORM
+#include "other/homlet.h"
+#endif
+
 #define ION_IOC_SUNXI_PHYS_ADDR 7
 #define HAL_PIXEL_FORMAT_AW_NV12 0x101
 #define PIPE_NUM 4
@@ -80,11 +84,6 @@ typedef struct DELayerPrivate {
 	float pipeScaleH;
 }DELayerPrivate_t;
 
-typedef struct DisplayConfigPrivate {
-	hwc_rect_t screenDisplay;
-    disp_tv_mode mode;
-}DisplayConfigPrivate_t;
-
 /*
  * hardware Layout:
  * 0~fixVideoPipeNum-1 is video channel;
@@ -115,16 +114,8 @@ char displayName[5][10] = {
 {"vga"},
 {"default"},
 };
-typedef struct
-{
-	disp_tv_mode    mode;
-	int             width;
-	int             height;
-	int             refreshRate;
-	bool support;
-}tv_para_t;
 
-static tv_para_t hdmi_support[]=
+tv_para_t hdmi_support[]=
 {
 	/* 1'st is default */
 	{DISP_TV_MOD_1080P_60HZ,       1920,   1080, 60, 0},
@@ -210,7 +201,9 @@ bool layerCanScale(long long deFreq, Display_t *display, Layer_t *layer)
 	screenW = hwConfig->screenDisplay.right - hwConfig->screenDisplay.left;
 	calcGlobleLayerFactor(display, layer, &widthScale, &hightScale);
 	if (!layerIsVideo(layer)) {
-        return config->width < 2048;
+#if (TARGET_BOARD_PLATFORM != petrel)
+		return config->width < 2048;
+#endif
 	}
 
 	srcW = layer->crop.right - layer->crop.left;
@@ -234,6 +227,80 @@ bool layerCanScale(long long deFreq, Display_t *display, Layer_t *layer)
 		return 1;//can
 
 }
+
+
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#define min(a,b) ((a) < (b) ? (a) : (b))
+
+/*
+ * check if de can handle ui scale.
+ *
+ * input params:
+ * ovlw, ovlh : source size
+ * outw, outh : frame size
+ * lcdw, lcdh : screen size
+ * lcd_fps : frame rate in Hz
+ * de_freq : de clock freqence in Hz
+ *
+ * return:
+ * 1 -- can use de scale
+ * 0 -- can NOT use de scale
+ */
+static int de_scale_capability_detect(
+            unsigned int ovlw, unsigned int ovlh,
+            unsigned int outw, unsigned int outh,
+            unsigned long long lcdw,
+            unsigned long long lcdh,
+            unsigned long long lcd_fps,
+            unsigned long long de_freq)
+{
+	    unsigned long long de_freq_req;
+	    unsigned long long lcd_freq;
+	    unsigned long long layer_cycle_num;
+	    unsigned int dram_efficience = 95;
+
+	    /*
+	     *  ovlh > outh : vertical scale down
+	     *  ovlh < outh : vertical scale up
+	     */
+	    if (ovlh > outh)
+	        layer_cycle_num = max(ovlw, outw) + max((ovlh - outh) * ovlw / outh, lcdw - outw);
+	    else
+	        layer_cycle_num = max(ovlw, outw) + (lcdw - outw);
+
+	    lcd_freq = (lcdh) * (lcdw) * (lcd_fps) * 10 / 9;
+	    de_freq_req = lcd_freq * layer_cycle_num * 100 / dram_efficience;
+	    de_freq_req = de_freq_req / lcdw;
+
+	    if (de_freq > de_freq_req)
+	        return 1;
+	    else
+	        return 0;
+	}
+
+static int hwc_ui_scaler_check(Display_t *display, Layer_t *layer)
+{
+	int src_w = ceil(layer->crop.right  - layer->crop.left);
+	int src_h = ceil(layer->crop.bottom - layer->crop.top);
+	int out_w = layer->frame.right  - layer->frame.left;
+	int out_h = layer->frame.bottom - layer->frame.top;
+	DisplayConfig_t *dispconfig;
+
+	dispconfig = display->displayConfigList[display->activeConfigId];
+	int InitDisplayWidth = dispconfig->width;
+	int InitDisplayHeight = dispconfig->height;
+
+	out_w = out_w * display->hpercent * display->VarDisplayWidth  / InitDisplayWidth  / 100;
+	out_h = out_h * display->vpercent * display->VarDisplayHeight / InitDisplayHeight / 100;
+
+	out_w = out_w == 0 ? 1 : out_w;
+	out_h = out_h == 0 ? 1 : out_h;
+
+	return de_scale_capability_detect(src_w, src_h, out_w, out_h,
+					display->VarDisplayWidth,
+					display->VarDisplayHeight, 60, 696000000);
+}
+
 
 static inline void resetLayer(Layer_t *layer)
 {
@@ -309,6 +376,162 @@ void resetLayerList(Display_t *display)
 		trResetErr(display);
 }
 
+static int calc_point_byPercent(const unsigned char percent,
+    const int middle_point, const int src_point)
+{
+    int condition = (src_point > middle_point) ? 1 : 0;
+    int length = condition ? (src_point - middle_point) : (middle_point - src_point);
+    length = length * percent / 100;
+    return condition ? (middle_point + length) : (middle_point - length);
+}
+
+void recomputeDisplayFrame(int screenRadio, const hwc_rect_t sourceCrop,
+    const int unitedFrameWidth, const int unitedFrameHeight, hwc_rect_t *displayFrame)
+{
+    switch(screenRadio) {
+    case SCREEN_AUTO: {
+        unsigned int ratio_width, ratio_height;
+        int frame_width = sourceCrop.right - sourceCrop.left;
+        int frame_height = sourceCrop.bottom - sourceCrop.top;
+        if(frame_width >= unitedFrameWidth || frame_height >= unitedFrameHeight) {
+            // scale down
+            if(frame_width > unitedFrameWidth) {
+                frame_height = frame_height * unitedFrameWidth / frame_width;
+                frame_width = unitedFrameWidth;
+            }
+            if(frame_height > unitedFrameHeight) {
+                frame_width = frame_width * unitedFrameHeight / frame_height;
+                frame_height = unitedFrameHeight;
+            }
+        } else {
+            // scale up
+            ratio_width = frame_width * unitedFrameHeight;
+            ratio_height = frame_height * unitedFrameWidth;
+            if(ratio_width >= ratio_height) {
+                // scale up until frame_width equal unitedFrameWidth
+                frame_height = ratio_height / frame_width;
+                frame_width = unitedFrameWidth;
+            } else {
+                // scale up until frame_height equal unitedFrameHeight
+                frame_width = ratio_width / frame_height;
+                frame_height = unitedFrameHeight;
+            }
+        }
+        //ALOGD("###frame[%d,%d], unitedFrame[%d,%d], displayFrame[%d,%d,%d,%d]",
+        //    frame_width, frame_height, unitedFrameWidth, unitedFrameHeight,
+        //    displayFrame->left, displayFrame->right, displayFrame->top, displayFrame->bottom);
+
+        if(unitedFrameWidth > frame_width) {
+            ratio_width = frame_width * (displayFrame->right - displayFrame->left)
+                / unitedFrameWidth;
+            displayFrame->left += (displayFrame->right - displayFrame->left - ratio_width) >> 1;
+            displayFrame->right = displayFrame->left + ratio_width;
+        }
+        if(unitedFrameHeight > frame_height) {
+            ratio_height = frame_height * (displayFrame->bottom - displayFrame->top)
+                / unitedFrameHeight;
+            displayFrame->top += (displayFrame->bottom - displayFrame->top - ratio_height) >> 1;
+            displayFrame->bottom = displayFrame->top + ratio_height;
+        }
+    }
+        break;
+    case SCREEN_FULL:
+    // here do nothing because the frame of cmcc is allready and always full.
+    default:
+        break;
+    }
+}
+
+static bool resize_layer(Display_t *display, disp_layer_info2 *layer_info , Layer_t *layer)
+{
+	hwc_rect_t sourceCrop;
+	hwc_rect_t displayFrame;
+	DisplayPrivate_t *hwdisplay;
+	DisplayConfigPrivate_t *hwconfig;
+	DisplayConfig_t *dispconfig;
+
+	dispconfig = display->displayConfigList[display->activeConfigId];
+	hwdisplay = toHwDisplay(display);
+	hwconfig = toHwConfig(dispconfig);
+
+#if 0
+	int VarDisplayWidth = hwconfig->screenDisplay.right - hwconfig->screenDisplay.left;
+	int VarDisplayHeight = hwconfig->screenDisplay.bottom - hwconfig->screenDisplay.top;
+	int InitDisplayWidth = dispconfig->width;
+	int InitDisplayHeight = dispconfig->height;
+#endif
+
+	int VarDisplayWidth = display->VarDisplayWidth;
+	int VarDisplayHeight = display->VarDisplayHeight;
+	int InitDisplayWidth = dispconfig->width;
+	int InitDisplayHeight = dispconfig->height;
+
+	sourceCrop.left =   layer->crop.left < 0 ? 0 : layer->crop.left;
+	sourceCrop.right =  layer->crop.right < 0 ? 0 : layer->crop.right;
+	sourceCrop.top =    layer->crop.top < 0 ? 0 : layer->crop.top;
+	sourceCrop.bottom = layer->crop.bottom < 0 ? 0 : layer->crop.bottom;
+
+	layer_info->fb.crop.x = (long long)(((long long)(sourceCrop.left)) << 32);
+	layer_info->fb.crop.width = (long long)(((long long)(sourceCrop.right)) << 32);
+	layer_info->fb.crop.width -= layer_info->fb.crop.x;
+	layer_info->fb.crop.y = (long long)(((long long)(sourceCrop.top)) << 32);
+	layer_info->fb.crop.height = (long long)(((long long)(sourceCrop.bottom)) << 32);
+	layer_info->fb.crop.height -= layer_info->fb.crop.y;
+
+	memcpy((void *)&displayFrame, (void *)&(layer->frame), sizeof(hwc_rect_t));
+
+	if(layerIsVideo(layer)) {
+		int unitedFrameWidth = InitDisplayWidth;
+		int unitedFrameHeight = InitDisplayHeight;
+		recomputeDisplayFrame(display->screenRadio, sourceCrop,
+				unitedFrameWidth, unitedFrameHeight, &displayFrame);
+	}
+
+	layer_info->screen_win.x =
+		calc_point_byPercent(display->hpercent, InitDisplayWidth >> 1, displayFrame.left)
+		* VarDisplayWidth / InitDisplayWidth;
+	layer_info->screen_win.width =
+		calc_point_byPercent(display->hpercent, InitDisplayWidth >> 1, displayFrame.right)
+		* VarDisplayWidth / InitDisplayWidth;
+	layer_info->screen_win.width -= layer_info->screen_win.x;
+	layer_info->screen_win.width = (0 == layer_info->screen_win.width) ? 1 : layer_info->screen_win.width;
+	layer_info->screen_win.y =
+		calc_point_byPercent(display->vpercent, InitDisplayHeight >> 1, displayFrame.top)
+		* VarDisplayHeight / InitDisplayHeight;
+	layer_info->screen_win.height =
+		calc_point_byPercent(display->vpercent, InitDisplayHeight >> 1, displayFrame.bottom)
+		* VarDisplayHeight / InitDisplayHeight;
+	layer_info->screen_win.height -= layer_info->screen_win.y;
+	layer_info->screen_win.height = (0 == layer_info->screen_win.height) ? 1 : layer_info->screen_win.height;
+/*
+	ALOGD("screen[%d,%d,%d,%d]", layer_info->screen_win.x, layer_info->screen_win.y,
+	    layer_info->screen_win.width, layer_info->screen_win.height);
+*/
+        return 0;
+}
+
+static bool check_hw_dataspace_mode(Display_t *display, Layer_t *layer)
+{
+	if ((NULL == layer) || (NULL == display) || (display->displayId != 0))
+		return 0;
+
+	int dataspace_mode = 0;
+
+	if (DISPLAY_OUTPUT_DATASPACE_MODE_AUTO == display->dataspace_mode) {
+		int transfer = layer->dataspace & HAL_DATASPACE_TRANSFER_MASK;
+		int standard = layer->dataspace & HAL_DATASPACE_STANDARD_MASK;
+		if ((HAL_DATASPACE_TRANSFER_ST2084 == transfer)
+				|| (HAL_DATASPACE_TRANSFER_HLG == transfer))
+			dataspace_mode = DISPLAY_OUTPUT_DATASPACE_MODE_HDR;
+		else
+			dataspace_mode = DISPLAY_OUTPUT_DATASPACE_MODE_SDR;
+	} else {
+		dataspace_mode = display->dataspace_mode;
+	}
+
+	return (dataspace_mode == DISPLAY_OUTPUT_DATASPACE_MODE_HDR) ? true : false;
+}
+
 void resetDisplayConfig(Display_t *display)
 {
 	DisplayPrivate_t *hwdisplay;
@@ -322,15 +545,33 @@ void resetDisplayConfig(Display_t *display)
 	hwconfig->screenDisplay.left = hwdisplay->ScreenCutOff.left;
 	hwconfig->screenDisplay.right = dispconfig->width - hwdisplay->ScreenCutOff.right;
 	hwconfig->screenDisplay.top = hwdisplay->ScreenCutOff.top;
-	hwconfig->screenDisplay.right = dispconfig->height - hwdisplay->ScreenCutOff.bottom;
+	hwconfig->screenDisplay.bottom = dispconfig->height - hwdisplay->ScreenCutOff.bottom;
 }
 
 void resetDisplay(Display_t *display)
 {
+	struct listnode *node;
+	Layer_t *layer;
+	int isHDR = 0;
+	DESource_t *deHw = &DESource[display->displayId];
+
+	deHw->fixPipeNumber = (display->displayId == 0) ? 4 : 2;
+	list_for_each(node, &display->layerSortedByZorder) {
+		layer = node_to_item(node, Layer_t, node);
+		isHDR |= check_hw_dataspace_mode(display, layer);
+	}
+	if (isHDR) {
+#ifdef HOMLET_PLATFORM
+		homlet_dataspace_change_callback(isHDR);
+#endif
+		deHw->fixPipeNumber = 2;
+	}
 
 	resetDisplayConfig(display);
 	/*  */
 	display->needclientTarget = 0;
+
+
 }
 
 void addClinetTarget(Display_t *display)
@@ -394,14 +635,23 @@ static inline int checkSupportFormat(Layer_t *layer)
 	if (handle == NULL)
 		return 0;
 	switch(handle->format) {
-	    case HAL_PIXEL_FORMAT_RGBA_8888:
-	    case HAL_PIXEL_FORMAT_RGBX_8888:
-	    case HAL_PIXEL_FORMAT_RGB_888:
-	    case HAL_PIXEL_FORMAT_RGB_565:
-	    case HAL_PIXEL_FORMAT_BGRA_8888:
-	    case HAL_PIXEL_FORMAT_YV12:
+		case HAL_PIXEL_FORMAT_RGBA_8888:
+		case HAL_PIXEL_FORMAT_RGBX_8888:
+		case HAL_PIXEL_FORMAT_RGB_888:
+		case HAL_PIXEL_FORMAT_RGB_565:
+		case HAL_PIXEL_FORMAT_BGRA_8888:
+		case HAL_PIXEL_FORMAT_YV12:
 		case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-	    case HAL_PIXEL_FORMAT_BGRX_8888:
+		case HAL_PIXEL_FORMAT_BGRX_8888:
+		case HAL_PIXEL_FORMAT_AW_NV12:
+#if DE_VERSION == 30
+		case HAL_PIXEL_FORMAT_AW_YV12_10bit:
+		case HAL_PIXEL_FORMAT_AW_I420_10bit:
+		case HAL_PIXEL_FORMAT_AW_NV21_10bit:
+		case HAL_PIXEL_FORMAT_AW_NV12_10bit:
+		case HAL_PIXEL_FORMAT_AW_P010_UV:
+		case HAL_PIXEL_FORMAT_AW_P010_VU:
+#endif
 	        return 1;
 	    default:
 	        return 0;
@@ -463,7 +713,6 @@ bool checkLayerClientCross(struct listnode *layerSortedByZorder, Layer_t *layer)
 
 bool checkSimpleSupport(Display_t *display, Layer_t *layer)
 {
-
 	if(layer->compositionType == HWC2_COMPOSITION_CLIENT_TARGET)
 		return true;
 	if (display->colorTransformHint != 0) {
@@ -497,6 +746,16 @@ bool checkSimpleSupport(Display_t *display, Layer_t *layer)
 		layer->duetoFlag = TRANSFROM_RT;
 		return false;
 	}
+
+	// for afbc
+	private_handle_t *handle = (private_handle_t *)layer->buffer;
+	if (handle && is_afbc_buf(handle)) {
+		if (hwc_ui_scaler_check(display, layer) == 0) {
+			layer->duetoFlag = SCALE_OUT;
+			return false;
+		}
+	}
+
 	if (!checkDealContiMem(layer)){
 #ifdef USE_IOMMU
 		return true;
@@ -945,6 +1204,93 @@ int setupSolidColorLayer(Layer_t *layer, disp_layer_config2 *layerConfig)
 
 }
 
+static int setup_sunxi_metadata(Layer_t *layer, disp_layer_info2 *layer_info)
+{
+#if (GRALLOC_SUNXI_METADATA_BUF & (DE_VERSION == 30))
+	private_handle_t *handle = (private_handle_t *)layer->buffer;
+
+	/* Update handle->flags from metadata buffer */
+	handle->ion_metadata_flag &= ionGetMetadataFlag(layer->buffer);
+
+	layer_info->fb.metadata_flag = handle->ion_metadata_flag;
+	layer_info->fb.metadata_size = handle->ion_metadata_size;
+	layer_info->fb.metadata_fd = handle->metadata_fd;
+	if (is_afbc_buf(handle))
+		layer_info->fb.fbd_en = 1;
+#if 0
+	ALOGD("fbd_en=%d, metadata_flag=0x%x, metadata_size=%d, metadata__buf[0x%llx, %x]",
+			layer_info->fb.fbd_en,
+			layer_info->fb.metadata_flag,
+			layer_info->fb.metadata_size,
+			layer_info->fb.metadata_buf,
+			get_ion_address(handle->metadata_fd));
+#endif
+#else
+	layer, layer_info;
+#endif /* GRALLOC_SUNXI_METADATA_BUF */
+	return 0;
+}
+
+static int setup_layer_dataspace(
+		disp_layer_info2 *layer_info, int32_t dataspace)
+{
+#if (DE_VERSION == 30)
+	unsigned int transfer = (dataspace & HAL_DATASPACE_TRANSFER_MASK)
+		>> HAL_DATASPACE_TRANSFER_SHIFT;
+	unsigned int standard = (dataspace & HAL_DATASPACE_STANDARD_MASK)
+		>> HAL_DATASPACE_STANDARD_SHIFT;
+	unsigned int range = (HAL_DATASPACE_RANGE_FULL
+			!= (dataspace & HAL_DATASPACE_RANGE_MASK)) ? 0 : 1; /* 0: limit. 1: full */
+
+	/* color space table [standard][range] */
+	const disp_color_space cs_table[][2] = {
+		{DISP_UNDEF, DISP_UNDEF_F},
+		{DISP_BT709, DISP_BT709_F},
+		{DISP_BT470BG, DISP_BT470BG_F},
+		{DISP_BT470BG, DISP_BT470BG_F},
+		{DISP_BT601, DISP_BT601_F},
+		{DISP_BT601, DISP_BT601_F},
+		{DISP_BT2020NC, DISP_BT2020NC_F},
+		{DISP_BT2020C, DISP_BT2020C_F},
+		{DISP_FCC, DISP_FCC_F},
+		{DISP_BT709, DISP_BT709_F},
+		{DISP_BT709, DISP_BT709_F},
+		{DISP_BT709, DISP_BT709_F},
+	};
+	if ((range < sizeof(cs_table[0]) / sizeof(cs_table[0][0]))
+			&& (standard < sizeof(cs_table) / sizeof(cs_table[0]))) {
+		layer_info->fb.color_space = cs_table[standard][range];
+	} else {
+		ALOGD("unknown dataspace standard(0x%x) range(0x%x)", standard, range);
+		layer_info->fb.color_space = range ? DISP_UNDEF_F : DISP_UNDEF;
+	}
+
+	const disp_eotf eotf_table[] = {
+		DISP_EOTF_UNDEF,
+		DISP_EOTF_LINEAR,
+		DISP_EOTF_IEC61966_2_1,
+		DISP_EOTF_BT601,
+		DISP_EOTF_GAMMA22,
+		DISP_EOTF_GAMMA28,  /* HAL_DATASPACE_TRANSFER_GAMMA2_6 */
+		DISP_EOTF_GAMMA28,
+		DISP_EOTF_SMPTE2084,
+		DISP_EOTF_ARIB_STD_B67
+	};
+	if (transfer < sizeof(eotf_table) / sizeof(eotf_table[0])) {
+		layer_info->fb.eotf = eotf_table[transfer];
+	} else {
+		ALOGD("unknown dataspace Transfer(0x%x)", transfer);
+		layer_info->fb.eotf = DISP_EOTF_UNDEF;
+	}
+	/* ALOGD("layer_info_fb: eotf=%d, cs=%d",
+		layer_info->fb.eotf, layer_info->fb.color_space);
+	*/
+#else
+	layer_info, dataspace;
+#endif
+	return 0;
+}
+
 static int setupDisplayInfo(Display_t *display, Layer_t *layer, disp_layer_config2 *layerConfig, int zorder)
 {
 	int  i = 0;
@@ -1045,6 +1391,11 @@ static int setupDisplayInfo(Display_t *display, Layer_t *layer, disp_layer_confi
 		dst_stride_h = swap;
 	}
 
+	layer->crop.left = s_left;
+	layer->crop.top = s_top;
+	layer->crop.right = s_right;
+	layer->crop.bottom = s_bottom;
+
 	info->fb.crop.x = ((long long)(s_left) << 32);
 	info->fb.crop.y = ((long long)(s_top) << 32);
 	info->fb.crop.width = ((long long)(s_right - s_left) << 32);
@@ -1054,6 +1405,8 @@ static int setupDisplayInfo(Display_t *display, Layer_t *layer, disp_layer_confi
 	info->screen_win.y = layer->frame.top < 0 ? 0 : layer->frame.top;
 	info->screen_win.width = layer->frame.right - layer->frame.left;
 	info->screen_win.height = layer->frame.bottom - layer->frame.top;
+
+	resize_layer(display, info , layer);
 
 	info->fb.size[0].width =  dst_stride_w;
 	info->fb.size[1].width =  dst_stride_w / 2;
@@ -1092,10 +1445,32 @@ static int setupDisplayInfo(Display_t *display, Layer_t *layer, disp_layer_confi
 		case HAL_PIXEL_FORMAT_AW_NV12:
 			info->fb.format = DISP_FORMAT_YUV420_SP_UVUV;
 			break;
+#if (DE_VERSION == 30)
+		case HAL_PIXEL_FORMAT_AW_YV12_10bit:
+		case HAL_PIXEL_FORMAT_AW_I420_10bit:
+			info->fb.format = DISP_FORMAT_YUV420_P;
+			break;
+		case HAL_PIXEL_FORMAT_AW_NV21_10bit:
+			info->fb.format = DISP_FORMAT_YUV420_SP_VUVU;
+			break;
+		case HAL_PIXEL_FORMAT_AW_NV12_10bit:
+			info->fb.format = DISP_FORMAT_YUV420_SP_UVUV;
+			break;
+		case HAL_PIXEL_FORMAT_AW_P010_UV:
+			info->fb.format = DISP_FORMAT_YUV420_SP_UVUV_10BIT;
+			break;
+		case HAL_PIXEL_FORMAT_AW_P010_VU:
+			info->fb.format = DISP_FORMAT_YUV420_SP_VUVU_10BIT;
+			break;
+#endif
 		default:
 			ALOGE("DO not support format 0x%x in %s", handle->format, __FUNCTION__);
 			goto err;
 	}
+
+	if (layerIsVideo(layer))
+		setup_sunxi_metadata(layer, info);
+	setup_layer_dataspace(info, layer->dataspace);
 
 	hwdisplay = toHwDisplay(display);
 
@@ -1400,10 +1775,11 @@ static int setActiveConfig(Display_t *display, DisplayConfig_t *config)
 	if (hwdisplay->type.type == DISP_OUTPUT_TYPE_LCD)
 		return 0;
 
-
+#ifndef HOMLET_PLATFORM
 	if (ioctl(dispFd, DISP_DEVICE_SWITCH, (unsigned long)arg) == -1) {
 		ALOGE("switch device failed!\n");
 	}
+#endif
 	return 0;
 }
 
@@ -1500,6 +1876,8 @@ int initPermanentDisplay(Display_t *display)
     config->vsyncPeriod = 1000000000 / refreshRate;
 	config->width = info.xres;
 	config->height = info.yres;
+	display->VarDisplayWidth = config->width;
+	display->VarDisplayHeight = config->height;
 	display->configNumber = 1;
 	display->activeConfigId = 0;
 	display->displayConfigList[0] = config;
@@ -1591,8 +1969,17 @@ loop:
 	display->displayConfigList[fix] = displayconfig;
 	display->activeConfigId = 0;
 	display->default_mode = hwconfig->mode;
+	display->VarDisplayWidth = display->displayConfigList[0]->width;
+	display->VarDisplayHeight = display->displayConfigList[0]->height;
+
 	setActiveConfig(display, display->displayConfigList[0]);
 
+	return 0;
+}
+
+int initVariableCvbs(Display_t *display)
+{
+	display;
 	return 0;
 }
 
@@ -1663,6 +2050,7 @@ int de2Init(Display_t* display)
 			initVariableHdmi(display);
 			break;
 		case DISP_OUTPUT_TYPE_TV:
+			initVariableCvbs(display);
 			break;
 		case DISP_OUTPUT_TYPE_VGA:
 			break;
@@ -1675,6 +2063,11 @@ int de2Init(Display_t* display)
 	display->vsyncEn = 1;
 	display->plugIn = 1;
 	display->retirfence = -1;
+	display->hpercent = 100;
+	display->vpercent = 100;
+	display->dataspace_mode = DISPLAY_OUTPUT_DATASPACE_MODE_SDR;
+	display->screenRadio = SCREEN_FULL;
+
 	debugInitDisplay(display);
 
 	submitThread = initSubmitThread(display);
@@ -1696,11 +2089,11 @@ int de2Init(Display_t* display)
 	return 0;
 }
 
-static int clearAllLayers(Display_t *display)
+int clearAllLayers(int displayId)
 {
 	int ret = 0;
 	unsigned long arg[4] = {0};
-	unsigned int chn = display->displayId ? 2 : 4;
+	unsigned int chn = displayId ? 2 : 4;
 	unsigned int ly = 4;
 	unsigned int i, j;
 
@@ -1714,7 +2107,7 @@ static int clearAllLayers(Display_t *display)
 		}
 	}
 	/* open protect. */
-	arg[0] = display->displayId;
+	arg[0] = displayId;
 	arg[1] = 1;
 
 	ret = ioctl(dispFd, DISP_SHADOW_PROTECT, (unsigned long)arg);
@@ -1733,7 +2126,7 @@ static int clearAllLayers(Display_t *display)
 		return -1;
 	}
 
-	arg[0] = display->displayId;
+	arg[0] = displayId;
 	arg[1] = 0;
 	ret = ioctl(dispFd, DISP_SHADOW_PROTECT, (unsigned long)arg);
 	if(ret != 0)
@@ -1756,7 +2149,7 @@ int de2Deinit(Display_t *display)
 	display->plugIn = 0;
 	display->active = 0;
 
-	clearAllLayers(display);
+	clearAllLayers(display->displayId);
 
 	pthread_mutex_lock(&display->listMutex);
 	while (display->configNumber--) {
@@ -1792,7 +2185,7 @@ int32_t de2SetPowerMode(Display_t* display, int32_t mode)
     case HWC2_POWER_MODE_OFF:
         arg[1] = 1;
         vsyncEn = 0;
-	clearAllLayers(display);
+	clearAllLayers(display->displayId);
         break;
     case HWC2_POWER_MODE_DOZE:
     case HWC2_POWER_MODE_DOZE_SUSPEND:
@@ -1842,21 +2235,21 @@ int setDisplayName(Display_t *display)
 	hwdisplay = toHwDisplay(display);
 
 	switch (hwdisplay->type.type) {
-    case DISP_OUTPUT_TYPE_LCD:
-         display->displayName = displayName[0];
-        break;
-    case DISP_OUTPUT_TYPE_HDMI:
-        display->displayName = displayName[1];
-        break;
-    case DISP_OUTPUT_TYPE_TV:
-		display->displayName = displayName[2];
-        break;
-    case DISP_OUTPUT_TYPE_VGA:
-		display->displayName = displayName[3];
-        break;
-    default:
-		display->displayName = displayName[1];
-        break;
+		case DISP_OUTPUT_TYPE_LCD:
+			display->displayName = displayName[0];
+			break;
+		case DISP_OUTPUT_TYPE_HDMI:
+			display->displayName = displayName[1];
+			break;
+		case DISP_OUTPUT_TYPE_TV:
+			display->displayName = displayName[2];
+			break;
+		case DISP_OUTPUT_TYPE_VGA:
+			display->displayName = displayName[3];
+			break;
+		default:
+			display->displayName = displayName[1];
+			break;
 	}
 	return 0;
 }
@@ -1898,10 +2291,11 @@ int displayDeviceInit(Display_t ***display)
 		arg[0] = i;
 		arg[1] = (unsigned long)&hwdisplay->type;
 		ret = ioctl(dispFd, DISP_GET_OUTPUT, arg);
-		if (ret)
-			ALOGE("get [Disp%d] output type is NONE!\n", i);
-		else
+		if (ret > 0)
 			ALOGV("get [Disp%d] output type is not NONE!\n", i);
+		else
+			ALOGE("get [Disp%d] output type is NONE!\n", i);
+
 		if (hwdisplay->type.type == DISP_OUTPUT_TYPE_LCD) {
 			ALOGD("find Permanent display:%d", i);
 			fixdiplay = i + 1;
@@ -1935,6 +2329,10 @@ int displayDeviceInit(Display_t ***display)
 		dispArray[0] = dispArray[1];
 		dispArray[1] = disp;
 	}
+
+	if (!strcmp(dispArray[0]->displayName, "hdmi"))
+		dispArray[1]->displayName = displayName[2];
+
 
 	ALOGD("display Id-Type:%d-%d and %d-%d", dispArray[0]->displayId, toHwDisplay(dispArray[0])->type.type,
 			dispArray[1]->displayId, toHwDisplay(dispArray[1])->type.type);

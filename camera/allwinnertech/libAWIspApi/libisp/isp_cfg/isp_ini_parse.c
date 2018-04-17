@@ -36,6 +36,7 @@
 #include "SENSOR_H/ov2718_wdr_ini_4v5.h"
 #include "SENSOR_H/imx317_wdr_ini_4v5.h"
 #include "SENSOR_H/ov2775_mipi.h"
+#include "SENSOR_H/gc2355_mipi.h"
 
 unsigned int isp_cfg_log_param = ISP_LOG_CFG;
 
@@ -785,6 +786,7 @@ struct isp_cfg_array cfg_arr[] = {
 	{"ar0238", "ar0238_default_ini_4v5", 1920, 1080, 30, 0, 0, &ar0238_default_ini_4v5},
 	{"ov2718_mipi", "ar0238_default_ini_4v5", 1920, 1080, 30, 1, 0, &ar0238_default_ini_4v5},
 	{"ov2775_mipi", "ov2775_mipi_isp_cfg", 1920, 1080, 30, 1, 0, &ov2775_mipi_isp_cfg},
+	{"gc2355_mipi", "gc2355_mipi_isp_cfg", 1600, 1200, 30, 0, 0, &gc2355_mipi_isp_cfg},
 };
 int temp_array_1[4] = {2800, 4000, 5000, 6500};
 int temp_array_2[6] = {2200, 2800, 4000, 5000, 5500, 6500};
@@ -977,6 +979,9 @@ int parser_ini_info(struct isp_param_config *param, char *sensor_name,
 		} else if (!strncmp(sensor_name, "ov2775", 6)) {
 			ISP_PRINT("use ov2775 isp config.\n");
 			cfg = &ov2775_mipi_isp_cfg;
+		} else if (!strncmp(sensor_name, "gc2355", 6)) {
+			ISP_PRINT("use gc2355 isp config.\n");
+			cfg = &gc2355_mipi_isp_cfg;
 		} else {
 			ISP_PRINT("use default isp config.\n");
 		}
@@ -986,6 +991,11 @@ int parser_ini_info(struct isp_param_config *param, char *sensor_name,
 	param->isp_3a_settings = *cfg->isp_3a_settings;
 	param->isp_iso_settings = *cfg->isp_iso_settings;
 	param->isp_tunning_settings = *cfg->isp_tunning_settings;
+
+	/******for a50 statistic select******/
+	param->isp_3a_settings.ae_hist_sel = HIST_AFTER_CNR;
+	param->isp_3a_settings.ae_stat_sel = AE_AFTER_CNR;
+	param->isp_3a_settings.awb_stat_sel = 0;
 
 	if(sync_mode) {
 		parser_sync_info(param, cfg_arr[i].isp_cfg_name, isp_id);
