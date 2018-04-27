@@ -135,6 +135,10 @@ tv_para_t hdmi_support[]=
 	{DISP_TV_MOD_3840_2160P_25HZ,  3840,   2160, 25, 0},
 	{DISP_TV_MOD_3840_2160P_24HZ,  3840,   2160, 24, 0},
 	{DISP_TV_MOD_3840_2160P_30HZ,  3840,   2160, 30, 0},
+	{DISP_TV_MOD_3840_2160P_60HZ,  3840,   2160, 60, 0},
+	{DISP_TV_MOD_3840_2160P_50HZ,  3840,   2160, 50, 0},
+	{DISP_TV_MOD_4096_2160P_60HZ,  4096,   2160, 60, 0},
+	{DISP_TV_MOD_4096_2160P_50HZ,  4096,   2160, 50, 0},
 	{DISP_TV_MOD_1080P_24HZ_3D_FP, 1920,   1080, 24, 0},
 	{DISP_TV_MOD_720P_50HZ_3D_FP,  1280,   720, 50, 0},
 	{DISP_TV_MOD_720P_60HZ_3D_FP,  1280,   720, 60, 0},
@@ -373,7 +377,7 @@ void resetLayerList(Display_t *display)
 		hastr |= layer->transform;
     }
 	if(!hastr)
-		trResetErr(display);
+		trResetErr();
 }
 
 static int calc_point_byPercent(const unsigned char percent,
@@ -532,6 +536,27 @@ static bool check_hw_dataspace_mode(Display_t *display, Layer_t *layer)
 	return (dataspace_mode == DISPLAY_OUTPUT_DATASPACE_MODE_HDR) ? true : false;
 }
 
+void reCalPipeForHDR(Display_t *display)
+{
+	struct listnode *node;
+	Layer_t *layer;
+	int isHDR = 0;
+	DESource_t *deHw = &DESource[display->displayId];
+
+	deHw->fixPipeNumber = (display->displayId == 0) ? 4 : 2;
+	list_for_each(node, &display->layerSortedByZorder) {
+		layer = node_to_item(node, Layer_t, node);
+		isHDR |= check_hw_dataspace_mode(display, layer);
+	}
+
+	if (isHDR) {
+#ifdef HOMLET_PLATFORM
+		homlet_dataspace_change_callback(isHDR);
+#endif
+		deHw->fixPipeNumber = 2;
+	}
+}
+
 void resetDisplayConfig(Display_t *display)
 {
 	DisplayPrivate_t *hwdisplay;
@@ -550,22 +575,6 @@ void resetDisplayConfig(Display_t *display)
 
 void resetDisplay(Display_t *display)
 {
-	struct listnode *node;
-	Layer_t *layer;
-	int isHDR = 0;
-	DESource_t *deHw = &DESource[display->displayId];
-
-	deHw->fixPipeNumber = (display->displayId == 0) ? 4 : 2;
-	list_for_each(node, &display->layerSortedByZorder) {
-		layer = node_to_item(node, Layer_t, node);
-		isHDR |= check_hw_dataspace_mode(display, layer);
-	}
-	if (isHDR) {
-#ifdef HOMLET_PLATFORM
-		homlet_dataspace_change_callback(isHDR);
-#endif
-		deHw->fixPipeNumber = 2;
-	}
 
 	resetDisplayConfig(display);
 	/*  */
@@ -1130,6 +1139,8 @@ int32_t de2AssignLayer(Display_t *display)
 	resetHwPipe(display, 0, deHw->fixPipeNumber - 1, true);
 	memResetPerframe(display);
 
+	reCalPipeForHDR(display);
+
 	TryToAssignLayer(display);
 
 	memContrlComplet(display);
@@ -1540,13 +1551,14 @@ int de2SetupLayer(Display_t *display, LayerSubmit_t *submitLayer)
 	disp_layer_config2 *layerConfig;
 	DELayerPrivate_t *hwlayer;
 	int i = 0;
+	int chn = display->displayId ? 2 : 4;
 
 	hw = &DESource[display->displayId];
 	layerConfig = hw->layerInfo;
-
-	for (i = 0; i < hw->fixPipeNumber * 4; i++) {
+	for (i = 0; i < chn * 4; i++) {
 		layerConfig[i].enable = 0;
 	}
+
 	list_for_each(node, &submitLayer->layerNode) {
 		layer = node_to_item(node, Layer_t, node);
 		hwlayer = toHwLayer(layer);
@@ -1608,6 +1620,7 @@ static int de2commitToDisplay(Display_t *display, LayerSubmit_t *submitLayer)
 	DisplayConfigPrivate_t *hwconfig;
 	DESource_t *hw;
 	disp_layer_config2 *layerConfig;
+	int pipe = display->displayId ? 2 : 4;
 
 	hwdisplay = toHwDisplay(display);
 	hw = &DESource[display->displayId];
@@ -1620,7 +1633,7 @@ static int de2commitToDisplay(Display_t *display, LayerSubmit_t *submitLayer)
 		}
 	}
 
-	return diplayToScreen(display->displayId, layerConfig, hw->fixPipeNumber * 4, submitLayer->sync.count);
+	return diplayToScreen(display->displayId, layerConfig, pipe * 4, submitLayer->sync.count);
 
 }
 
@@ -2218,13 +2231,12 @@ int32_t de2SetVsyncEnabled(Display_t *display, int32_t enabled)
 
 	arg[0] = display->displayId;
 	arg[1] = (enabled == HWC2_VSYNC_ENABLE)?1:0;
-	arg[1] = 1;
-
+	ALOGV("set display%d vsync enable:%d",display->displayId, enabled);
 	if (ioctl(dispFd, DISP_VSYNC_EVENT_EN, arg)) {
 		ALOGE("DISP_CMD_VSYNC_EVENT_EN ioctl failed: %s", strerror(errno));
 		return -1;
 	}
-	display->vsyncEn = enabled;
+	display->vsyncEn = !!enabled;
 
 	return 0;
 }

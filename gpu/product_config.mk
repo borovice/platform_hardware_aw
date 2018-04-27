@@ -52,7 +52,8 @@ PRODUCT_COPY_FILES += \
 	$(GPU_LIB_ROOT_DIR)/lib/libGLESv2_POWERVR_SGX544_115.so:vendor/lib/egl/libGLESv2_POWERVR_SGX544_115.so \
 	$(GPU_LIB_ROOT_DIR)/lib/gralloc.sunxi.so:vendor/lib/hw/gralloc.$(TARGET_BOARD_PLATFORM).so \
 	$(GPU_LIB_ROOT_DIR)/lib/powervr.ini:etc/powervr.ini \
-	$(GPU_LIB_ROOT_DIR)/lib/pvrsrvctl:vendor/bin/pvrsrvctl
+	$(GPU_LIB_ROOT_DIR)/lib/pvrsrvctl:vendor/bin/pvrsrvctl \
+	$(GPU_LIB_ROOT_DIR)/egl.cfg:system/lib/egl/egl.cfg
 endif
 
 # System prop for opengles version

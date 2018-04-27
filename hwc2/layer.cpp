@@ -89,6 +89,7 @@ deal:
 	layer->acquireFence = -1;
 	layer->myselfHandle = 0;
 	layer->buffer = NULL;
+	layer->ref = 1;
 	list_init(&layer->node);
 
 	return layer;
@@ -129,6 +130,13 @@ void layerCachePut(Layer_t *layer)
 	/* other fd source.if nesesory,
 	  * check if close surfaceFlinger's fd
 	  */
+	pthread_mutex_lock(&chaceMutex);
+	layer->ref--;
+	if (layer->ref > 0) {
+		pthread_mutex_unlock(&chaceMutex);
+		return;
+	}
+	pthread_mutex_unlock(&chaceMutex);
 	if (layer->myselfHandle) {
 		if (layer->buffer != NULL && handle->share_fd >= 0)
 			close(handle->share_fd);
@@ -176,6 +184,8 @@ void submitLayerCachePut(LayerSubmit_t *submitLayer)
 
 	list_for_each_safe(node, node2, &submitLayer->layerNode) {
 		layer = node_to_item(node, Layer_t, node);
+		list_remove(&layer->node);
+		list_init(&layer->node);
 		layerCachePut(layer);
 	}
 	if (submitLayer->sync.fd >= 0)
@@ -202,10 +212,11 @@ void submitLayerCachePut(LayerSubmit_t *submitLayer)
 Layer_t* layerDup(Layer_t *layer, int priveSize)
 {
 	Layer_t *duplayer = layerCacheGet(priveSize);
-	private_handle_t *handle = NULL,  *handle2 = NULL;
+	private_handle_t *handle = NULL, *handle2 = NULL;
 
 	memcpy(duplayer, layer, sizeof(Layer_t)+priveSize);
 	list_init(&duplayer->node);
+
 	if (layer->acquireFence >= 0)
 		duplayer->acquireFence = dup(layer->acquireFence);
 	/* dup the gralloc handle */
@@ -222,6 +233,7 @@ Layer_t* layerDup(Layer_t *layer, int priveSize)
 	duplayer->releaseFence = -1;
 	duplayer->preReleaseFence = -1;
 	duplayer->trcache = (void *)trCacheGet(layer);
+	duplayer->ref = 1;
 	return duplayer;
 }
 

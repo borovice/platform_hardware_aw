@@ -110,7 +110,8 @@ void callRefresh(Display_t *display)
 		callback = node_to_item(node, callbackInfo_t, node);
 		if (callback->hwDisplayBit & 1<< hwid) {
 			refresh = (HWC2_PFN_REFRESH)callback->pointer;
-			refresh(callback->data, (hwc2_display_t)display);
+			if (refresh != NULL)
+				refresh(callback->data, (hwc2_display_t)display);
 		}
 	}
 	pthread_mutex_unlock(&context->listMutex);
@@ -155,15 +156,19 @@ callVsync(eventThreadContext_t *context, int32_t hwid, int64_t timestamp)
 	Display_t *display;
 
 	display = findDisplay(hwid);
-	if (display ==  NULL || !display->vsyncEn)
+	if (display ==  NULL || !display->vsyncEn) 
 		return;
+
 	pthread_mutex_lock(&context->listMutex);
 
 	list_for_each(node, &context->callbackHead[CALLBACK_VSYNC]) {
 		callback = node_to_item(node, callbackInfo_t, node);
-		if (callback->hwDisplayBit == 1<< hwid) {
+		if (callback->hwDisplayBit & 1<< hwid) {
 			vsync_function = (HWC2_PFN_VSYNC)callback->pointer;
-			vsync_function(callback->data, (hwc2_display_t)display, timestamp);
+			if (vsync_function != NULL) {
+				vsync_function(callback->data, (hwc2_display_t)display, timestamp);
+				ALOGV("callVsync:%lld", timestamp);
+			}
 		}
 	}
 	pthread_mutex_unlock(&context->listMutex);

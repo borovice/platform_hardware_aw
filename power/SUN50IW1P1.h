@@ -30,9 +30,9 @@
 #define ROOMAGE_SUSTAINED    "816000 4 0 0 816000 4 0 0"
 #define ROOMAGE_VR_SUSTAINED "1200000 4 0 0 1200000 4 0 0"
 #define ROOMAGE_LAUNCH       "1152000 4 0 0 1152000 4 0 0"
-#define ROOMAGE_SCREEN_OFF   "480000 4 0 0 1152000 4 0 0"
-#define ROOMAGE_HOME         "0 0 0 0 1152000 4 0 0 0"
-#define ROOMAGE_MUSIC        "0 0 0 0 1152000 4 0 0 0"
+#define ROOMAGE_SCREEN_OFF   "0 0 0 0 816000 4 0 0"
+#define ROOMAGE_HOME         "0 0 0 0 816000 4 0 0"
+#define ROOMAGE_MUSIC        "0 0 0 0 816000 4 0 0"
 /* dram scene value defined */
 #define DRAM_NORMAL         "0"
 #define DRAM_HOME           "1"

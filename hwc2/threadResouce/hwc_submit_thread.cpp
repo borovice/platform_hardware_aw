@@ -37,7 +37,6 @@ int submitLayerToDisplay(Display_t *disp, LayerSubmit_t *submitLayer)
 
 	list_add_tail(&myThread->SubmitHead, &submitLayer->node);
 	myThread->cond->signal();
-
 	myThread->mutex->unlock();
 	return 0;
 }
@@ -58,7 +57,6 @@ void* submitThreadLoop(void *display)
 	struct listnode comHead, *commitHead, *node, *node2, *node3, *node4;
 	LayerSubmit_t *submitLayer = NULL, *preSubmit = NULL;
 	Layer_t *layer;
-	bool rotate;
 
 	disp = (Display_t *)display;
 	myThread = disp->commitThread;
@@ -97,16 +95,11 @@ void* submitThreadLoop(void *display)
 		list_for_each_safe(node, node2, commitHead) {
 			submitLayer = node_to_item(node, LayerSubmit_t, node);
 
-			rotate = 1;
-reloop:
 			list_for_each_safe(node3, node4, &submitLayer->layerNode) {
 				layer = node_to_item(node3, Layer_t, node);
-				if (rotate && layer->transform == 0)
-					continue;
-
 				if (layer->acquireFence >= 0) {
 					if (sync_wait((int)layer->acquireFence, 3000)) {
-						ALOGE("waite aquire fence err %d",layer->acquireFence);
+						ALOGE("submit loop waite aquire fence err %d", layer->acquireFence);
 						/* dump fence */
 					}
 				}
@@ -114,15 +107,8 @@ reloop:
 				/*if (checkSwWrite(layer))
 					syncLayerBuffer(layer);
 				*/
-				if (rotate)
-					submitTransformLayer(disp, layer, submitLayer->frameCount);
 				/* for debug */
-				if (!rotate)
-					dumpLayerZorder(layer, submitLayer->frameCount);
-			}
-			if (rotate) {
-				rotate = 0;
-				goto reloop;
+				dumpLayerZorder(layer, submitLayer->frameCount);
 			}
 
 			/* no block so may after waite fence,  set up layer info to disp config2 info  */
@@ -134,11 +120,14 @@ reloop:
 			  * so we wait for the last releasefence
 			  */
 			list_remove(&submitLayer->node);
+
 			if (preSubmit != NULL) {
-				sync_wait(preSubmit->sync.fd,
+				/*sync_wait(preSubmit->sync.fd,
 					(disp->displayConfigList[disp->activeConfigId]->vsyncPeriod / 1000000 +1));
+				*/
 				submitDelayWork(disp, preSubmit);
 			}
+
 			myThread->diplayCount = submitLayer->frameCount;
 			myThread->SubmitCount = submitLayer->sync.count;
 

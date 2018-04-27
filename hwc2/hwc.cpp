@@ -533,6 +533,8 @@ int32_t hwc_get_release_fences(hwc2_device_t* device, hwc2_display_t display,
 int32_t hwc_present_display(hwc2_device_t* device, hwc2_display_t display,
     int32_t* outRetireFence)
 {
+	ATRACE_CALL();
+
 	int privateLayerSize = 0;
 	LayerSubmit_t *submitLayer;
 	Layer_t *layer, *layer2;
@@ -542,7 +544,7 @@ int32_t hwc_present_display(hwc2_device_t* device, hwc2_display_t display,
 	unusedpara(device);
 	struct sync_info sync;
 
-	if(!findDisplay(display)){
+	if (!findDisplay(display)) {
 		ALOGE("ERROR %s:bad display", __FUNCTION__);
 		return HWC2_ERROR_BAD_DISPLAY;
 	}
@@ -582,8 +584,15 @@ int32_t hwc_present_display(hwc2_device_t* device, hwc2_display_t display,
 				ALOGE("layer dup err...");
 				goto err_setup_layer;
 			}
-			if (layer->compositionType != HWC2_COMPOSITION_CLIENT_TARGET)
-				layer->releaseFence = dup(sync.fd);
+
+			if (layer->transform == 0) {
+				if (layer->compositionType != HWC2_COMPOSITION_CLIENT_TARGET)
+					layer->releaseFence = dup(sync.fd);
+			} else {
+				if (layer->compositionType != HWC2_COMPOSITION_CLIENT_TARGET)
+					layer->releaseFence = get_rotate_fence_fd(layer2, dp, sync.fd, dp->frameCount);
+			}
+
 			ALOGV("%s:%p frame:%d fence:%d  sync:%d", __FUNCTION__, layer, dp->frameCount, layer->releaseFence, sync.count);
 			list_add_tail(&submitLayer->layerNode, &layer2->node);
 		}
@@ -1167,6 +1176,8 @@ tv_para_t tv_mode[]=
 	{DISP_TV_MOD_4096_2160P_30HZ,  4096,   2160, 30, 0},
 	{DISP_TV_MOD_3840_2160P_60HZ,  3840,   2160, 60, 0},
 	{DISP_TV_MOD_4096_2160P_60HZ,  4096,   2160, 60, 0},
+	{DISP_TV_MOD_3840_2160P_50HZ,  3840,   2160, 50, 0},
+	{DISP_TV_MOD_4096_2160P_50HZ,  4096,   2160, 50, 0},
 	{DISP_TV_MOD_1080P_24HZ_3D_FP, 1920,   1080, 24, 0},
 	{DISP_TV_MOD_720P_50HZ_3D_FP,  1280,   720, 50, 0},
 	{DISP_TV_MOD_720P_60HZ_3D_FP,  1280,   720, 60, 0},
@@ -1468,7 +1479,7 @@ static int hwc_device_open(const struct hw_module_t* module, const char* id,
 	}
 	layerCacheInit();
 	Iondeviceinit();
-	rotateDeviceInit(numberDisplay);
+	rotateDeviceInit();
 	eventThreadInit(mDisplay, numberDisplay, socketpair_fd[1]);
 	debugInit(numberDisplay);
 	memCtrlInit(mDisplay, numberDisplay);

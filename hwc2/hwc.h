@@ -49,6 +49,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <utils/Trace.h>
+#include "other/sunxi_tr.h"
 
 /************* Layer And Its operate API ****************/
 #define HWC2_COMPOSITION_CLIENT_TARGET 0xFF
@@ -130,6 +131,7 @@ static const char *hwcPrintInfo(enum sunnxi_dueto_flags eError)
 }
 
 typedef struct Layer{
+	volatile int ref;
 	int32_t compositionType;
 	int32_t releaseFence;
 	int32_t preReleaseFence;
@@ -508,11 +510,13 @@ bool memCtrlAddLayer(Display_t *display, Layer_t *layer, int* pAddmem);
 /* rotate ==  transform */
 extern bool supportTR(Display_t *display, Layer_t *layer);
 extern int rotateDeviceDeInit(int num);
-extern int rotateDeviceInit(int numdisp);
+extern int rotateDeviceInit(void);
 extern int submitTransformLayer(Display_t *display, Layer_t *layer, unsigned int syncCount);
 extern void trCachePut(Layer_t *layer);
 extern void* trCacheGet(Layer_t *layer);
-extern void trResetErr(Display_t *display);
+extern void trResetErr(void);
+extern int get_rotate_fence_fd(Layer_t *layer,Display_t *disp,  int fence, unsigned int syncCount);
+extern void deal_rotate_fence(tr_cache_Array *cache);
 /* mem debug */
 extern void *hwc_malloc(int size);
 extern void hwc_free(void *mem);

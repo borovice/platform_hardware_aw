@@ -101,6 +101,22 @@ typedef struct {
 	int fd;
 } tr_info;
 
+typedef struct {
+	unsigned int sync_cnt;
+	int releasefd;
+	int share_fd;//ion_handle share_fd
+	bool valid;
+}tr_cache_t;
+
+#define NOMORL_CACHE_N 3
+typedef struct {
+	volatile int ref;
+	tr_cache_t array[NOMORL_CACHE_N];
+	int currentid;
+	tr_info trInfo;
+	int size;
+}tr_cache_Array;
+
 typedef enum tag_TR_CMD {
 	TR_REQUEST = 0x03,
 	TR_RELEASE = 0x04,

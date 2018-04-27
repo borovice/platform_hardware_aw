@@ -66,17 +66,16 @@ static void sysfs_write(const char *path, char *s)
 
 static void power_init(struct power_module *module)
 {
-    ALOGI("power_init: init success!!");
-
+    //ALOGI("power_init: init success!!");
 }
 
 static void power_set_interactive(struct power_module *module, int on)
 {
-    ALOGI("power_set_interactive: %d\n",on);
-    ALOGI("power_set_interactive: init success!!");
+    //ALOGI("power_set_interactive: %d\n",on);
+    //ALOGI("power_set_interactive: init success!!");
     if(!on || low_power_mode) {
         sysfs_write(ROOMAGE,ROOMAGE_SCREEN_OFF);
-    #if defined A83T || A33 || A63 || VR9 || A50
+    #if defined A83T || A33 || A63 || VR9
         sysfs_write(GPUCOMMAND,"0");
     #endif
         benchmark_mode = 0;
@@ -88,7 +87,7 @@ static void power_set_interactive(struct power_module *module, int on)
 
 static void set_feature(struct power_module *module, feature_t feature, int state)
 {
-    ALOGI("set_feature: init success!!");
+    //ALOGI("set_feature: init success!!");
     struct power_module *aw = (struct power_module *) module;
     switch(feature) {
         default:
@@ -99,13 +98,13 @@ static void set_feature(struct power_module *module, feature_t feature, int stat
 }
 
 static ssize_t get_number_of_platform_modes(struct power_module *module) {
-    ALOGI("get_number_of_platform_modes: init success!!");
+    //ALOGI("get_number_of_platform_modes: init success!!");
     return 0;
 }
 
 static int get_platform_low_power_stats(struct power_module *module,
     power_state_platform_sleep_state_t *list) {
-    ALOGI("get_platform_low_power_stats: init success!!");
+    //ALOGI("get_platform_low_power_stats: init success!!");
     return 0;
 }
 
@@ -124,7 +123,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 break;
 
             case POWER_HINT_INTERACTION:
-                ALOGD("LAUNCH HINT:POWER_HINT_INTERACTION");
+                //ALOGD("LAUNCH HINT:POWER_HINT_INTERACTION");
                 break;
 
             case POWER_ROTATION:
@@ -203,11 +202,11 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 if (sustained_performance_mode || vr_mode || music_mode) {
                     return;
                 }
-                ALOGD("LAUNCH HINT: %s", data ? "ON" : "OFF");
+                //ALOGD("LAUNCH HINT: %s", data ? "ON" : "OFF");
                 if (data && launch_mode == 0) {
                     if (benchmark_mode == 1) {
                         benchmark_mode = 0;
-                    #if defined A83T || A33 || A63 || VR9 || A50
+                    #if defined A83T || A33 || A63 || VR9
                         sysfs_write(GPUCOMMAND,"0");
                     #endif
                     }
@@ -245,11 +244,11 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_NORMAL);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9 || A50
+            #if defined A83T || A33 || A63 || VR9
                 sysfs_write(GPUCOMMAND,"0");
             #endif
 
-            #if defined A64 || A63 || VR9 || A50
+            #if defined A64 || A63 || VR9
                 sysfs_write(DRAMPAUSE,"0");
             #endif
             break;
@@ -259,7 +258,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 //sysfs_write(CPU0LOCK,"1");
                 sysfs_write(CPU0GOV,INTERACTIVE_GOVERNOR);
                 sysfs_write(CPUHOT,"1");
-            #if defined A64 || A63 || VR9 || A50
+            #if defined A64 || A63 || VR9
                 sysfs_write(DRAMPAUSE,"0");
             #endif
                 break;
@@ -289,10 +288,10 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_PERF);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9 || A50
+            #if defined A83T || A33 || A63 || VR9
                 sysfs_write(GPUCOMMAND,"1");
             #endif
-            #if defined A64 || A63 || VR9 || A50
+            #if defined A64 || A63 || VR9
                 sysfs_write(DRAMPAUSE, "1");
             #endif
                 break;
@@ -313,11 +312,11 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_NORMAL);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9 || A50
+            #if defined A83T || A33 || A63 || VR9
                 sysfs_write(GPUCOMMAND,"0");
             #endif
 
-            #if defined A64 || A63 || VR9 || A50
+            #if defined A64 || A63 || VR9
                 sysfs_write(DRAMPAUSE,"0");
             #endif
                 break;
@@ -330,7 +329,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(DRAMSCEN,DRAM_BGMUSIC);
             #endif
 
-            #if defined A63 || VR9 || A50
+            #if defined A63 || VR9
  //               sysfs_write(DRAMPAUSE,"0");
             #endif
 
@@ -338,28 +337,28 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sysfs_write(GPUFREQ,GPU_NORMAL);
             #endif
 
-            #if defined A83T || A33 || A63 || VR9 || A50
+            #if defined A83T || A33 || A63 || VR9
                 sysfs_write(GPUCOMMAND,"0");
             #endif
 
                 break;
             case POWER_HINT_DISABLE_TOUCH:
-                ALOGI("==DISABLE TOUCH==");
-            #if defined A64 || A63 || VR9 || A50
+
+            #if defined A64 || A63 || VR9
                 if (data == NULL) {
                     ALOGW("Wrong parameters to control touchscreen runtime suspend!!!");
                     return;
                 }
-
+                ALOGI("==DISABLE TOUCH==");
                 int state = *((int *)data);
                 char tp_state[2]= {0};
                 sprintf(tp_state,"%d", state);
                 sysfs_write(TP_SUSPEND, tp_state);
-                ALOGI("==Touchscreen runtime suspend %s !", state == 1 ? "ON" : "OFF");
+                //ALOGI("==Touchscreen runtime suspend %s !", state == 1 ? "ON" : "OFF");
              #endif
                 break;
             default:
-                ALOGD("LAUNCH HINT:default");
+                //ALOGD("LAUNCH HINT:default");
                 break;
            }
 }

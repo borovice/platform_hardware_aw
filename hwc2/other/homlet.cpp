@@ -89,7 +89,15 @@ int Hwcps::set3DMode(int display, int mode) {
 int Hwcps::setDataspace(int display, int dataspace) {
     ALOGD("setDataspace: display[%d], dataspace=%d",
           display, dataspace);
-	hwc_setDataSpacemode(display, dataspace);
+
+    if (dataspace == IHWCPrivateService::eDataspaceHdr)
+        dataspace = DISPLAY_OUTPUT_DATASPACE_MODE_HDR;
+    else if (dataspace == IHWCPrivateService::eDataspaceSdr)
+        dataspace = DISPLAY_OUTPUT_DATASPACE_MODE_SDR;
+    else
+        ALOGD("Hwcps:setDataspace: unknow dataspace mode: %08x", dataspace);
+
+    hwc_setDataSpacemode(display, dataspace);
     return 0;
 }
 
