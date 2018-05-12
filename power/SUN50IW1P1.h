@@ -50,6 +50,6 @@
 /*thermal value*/
 #define THERMAL_EMUL_TEMP   "/sys/class/thermal/thermal_zone0/emul_temp"
 #define THERMAL_CLOSE_EMUL_TEMP  "50"
-
+#define THERMAL_OPEN_EMUL_TEMP   "0"
 #endif
 

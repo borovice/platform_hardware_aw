@@ -128,7 +128,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
 
             case POWER_ROTATION:
                 ALOGI("==ROTATION MODE==");
-                sysfs_write(ROOMAGE,ROOMAGE_LAUNCH);
+                //sysfs_write(ROOMAGE,ROOMAGE_LAUNCH);
                 break;
 
             case POWER_HINT_LOW_POWER:
@@ -221,6 +221,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                         return;
                     }
                     launch_mode = 0;
+                    sysfs_write(THERMAL_EMUL_TEMP,THERMAL_OPEN_EMUL_TEMP);
                     sysfs_write(ROOMAGE,ROOMAGE_NORMAL);
                     ALOGI("==LAUNCH_NORMAL MODE==");
                 }
@@ -234,6 +235,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 benchmark_mode = 0;
                 music_mode = 0;
                 ALOGI("==HOME MODE==");
+                sysfs_write(THERMAL_EMUL_TEMP,THERMAL_OPEN_EMUL_TEMP);
                 sysfs_write(ROOMAGE,ROOMAGE_HOME);
 
             #if defined A33 || defined A83T || defined A80
@@ -279,6 +281,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 sprintf(spid,"%d", ipid);
            ALOGD("LAUNCH HINT:%s", spid);
                 sysfs_write(TASKS,spid);*/
+                sysfs_write(THERMAL_EMUL_TEMP,THERMAL_CLOSE_EMUL_TEMP);
                 sysfs_write(ROOMAGE,ROOMAGE_BENCHMARK);
             #if defined A33 || A83T || A80
                 sysfs_write(DRAMSCEN,DRAM_NORMAL);
@@ -296,13 +299,14 @@ static void power_hint(struct power_module *module, power_hint_t hint,
             #endif
                 break;
             case POWER_HINT_NORMAL:
-                if (sustained_performance_mode || vr_mode ||benchmark_mode) {
+                if (sustained_performance_mode || vr_mode ||benchmark_mode || launch_mode) {
                     return;
                 }
                 benchmark_mode = 0;
                 music_mode = 0;
                 ALOGI("==NORMAL MODE==");
                 sysfs_write(CPU0GOV,INTERACTIVE_GOVERNOR);
+                sysfs_write(THERMAL_EMUL_TEMP,THERMAL_OPEN_EMUL_TEMP);
                 sysfs_write(ROOMAGE,ROOMAGE_NORMAL);
             #if defined A33 || A83T || A80
                 sysfs_write(DRAMSCEN,DRAM_NORMAL);
@@ -324,6 +328,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 benchmark_mode = 0;
                 music_mode = 1;
                 ALOGI("==MUSIC MODE==");
+                sysfs_write(THERMAL_EMUL_TEMP,THERMAL_OPEN_EMUL_TEMP);
                 sysfs_write(ROOMAGE, ROOMAGE_MUSIC);
             #if defined A33 || A83T || A80
                 sysfs_write(DRAMSCEN,DRAM_BGMUSIC);

@@ -170,23 +170,23 @@ static inline int trFormatToHal(unsigned char tr)
 static inline tr_pixel_format halToTRFormat(int halFformat)
 {
     switch(halFformat) {
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-			return TR_FORMAT_YUV420_SP_VUVU;
-        case HAL_PIXEL_FORMAT_YV12:
-			return TR_FORMAT_YUV420_P;
-		case HAL_PIXEL_FORMAT_AW_NV12:
-			return TR_FORMAT_YUV420_SP_UVUV;
-        case HAL_PIXEL_FORMAT_RGBA_8888:
-        case HAL_PIXEL_FORMAT_RGBX_8888:
+	    case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+		    return TR_FORMAT_YUV420_SP_VUVU;
+	    case HAL_PIXEL_FORMAT_YV12:
+		    return TR_FORMAT_YUV420_P;
+	    case HAL_PIXEL_FORMAT_AW_NV12:
+		    return TR_FORMAT_YUV420_SP_UVUV;
+	    case HAL_PIXEL_FORMAT_RGBA_8888:
+	    case HAL_PIXEL_FORMAT_RGBX_8888:
 	    case HAL_PIXEL_FORMAT_BGRA_8888:
-        case HAL_PIXEL_FORMAT_BGRX_8888:
-			return TR_FORMAT_ABGR_8888;
-		case HAL_PIXEL_FORMAT_RGB_888:
-			return TR_FORMAT_BGR_888;
-        case DISP_FORMAT_RGB_565:
-            return TR_FORMAT_BGR_565;
-        default :
-            return TR_FORMAT_YUV420_P;
+	    case HAL_PIXEL_FORMAT_BGRX_8888:
+		    return TR_FORMAT_ARGB_8888;
+	    case HAL_PIXEL_FORMAT_RGB_888:
+		    return TR_FORMAT_RGB_888;
+	    case HAL_PIXEL_FORMAT_RGB_565:
+		    return TR_FORMAT_RGB_565;
+	    default :
+		    return TR_FORMAT_YUV420_P;
     }
 }
 
@@ -293,7 +293,9 @@ int rotateDeviceDeInit(int num)
 		if(tr_disp->clienId != 0)
 			hwc_rotate_release(tr_disp->clienId);
 	}
-
+	pthread_join(thread_id, NULL);
+	delete(rotate_mutex);
+	delete(rotate_cond);
 	close(sw_sync_fd);
 	close(trfd);
 	trfd = -1;
@@ -606,8 +608,16 @@ bool layerToTrinfo(Layer_t *layer, tr_info *tr_inf, tr_cache_t *bCache)
 	addr += tr_inf->src_frame.pitch[i] * bpp[i] * tr_inf->src_frame.height[i];
         i++;
     }
-	tr_inf->src_frame.fd = -1;
-	/* tr_inf->src_frame.fd = handle->share_fd;*/
+
+    if (cnt == 3) {//YV12
+	    tr_inf->src_frame.laddr[2] = tr_inf->src_frame.laddr[0] +
+		    tr_inf->src_frame.pitch[0] * tr_inf->src_frame.height[0];
+	    tr_inf->src_frame.laddr[1] = tr_inf->src_frame.laddr[2] +
+		    tr_inf->src_frame.pitch[2] * tr_inf->src_frame.height[2];
+    }
+
+    tr_inf->src_frame.fd = -1;
+    /* tr_inf->src_frame.fd = handle->share_fd;*/
     tr_inf->src_rect.x = 0;
     tr_inf->src_rect.y = 0;
     tr_inf->src_rect.w = HWC_ALIGN(handle->width * bpp[0], handle->aw_byte_align[0])/ bpp[0];

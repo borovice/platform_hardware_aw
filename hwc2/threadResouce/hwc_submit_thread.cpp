@@ -57,6 +57,7 @@ void* submitThreadLoop(void *display)
 	struct listnode comHead, *commitHead, *node, *node2, *node3, *node4;
 	LayerSubmit_t *submitLayer = NULL, *preSubmit = NULL;
 	Layer_t *layer;
+	bool ctrlfps = 0;
 
 	disp = (Display_t *)display;
 	myThread = disp->commitThread;
@@ -77,6 +78,7 @@ void* submitThreadLoop(void *display)
 			continue;
 		}
 		showfps(disp);
+		ctrlfps = debugctrlfps();
 		if (list_empty(&myThread->SubmitHead)) {
 			myThread->mutex->unlock();
 			ALOGV("16ms not fresh");
@@ -97,7 +99,7 @@ void* submitThreadLoop(void *display)
 
 			list_for_each_safe(node3, node4, &submitLayer->layerNode) {
 				layer = node_to_item(node3, Layer_t, node);
-				if (layer->acquireFence >= 0) {
+				if (layer->acquireFence >= 0 && !ctrlfps) {
 					if (sync_wait((int)layer->acquireFence, 3000)) {
 						ALOGE("submit loop waite aquire fence err %d", layer->acquireFence);
 						/* dump fence */
@@ -132,6 +134,8 @@ void* submitThreadLoop(void *display)
 			myThread->SubmitCount = submitLayer->sync.count;
 
 			preSubmit = submitLayer;
+			if (ctrlfps)
+				usleep(20000);
 		}
 	}
 	if (preSubmit != NULL)

@@ -230,6 +230,8 @@ deal:
 		if (bitMapDisplay & (1<<i)) {
 			bit |= 1<<context->display[i]->displayId;
 		}
+		if (pointer == NULL)
+			context->display[i]->vsyncEn = 0;
 	}
 	cb->hwDisplayBit = bit;
 	cb->currentStatus = 0;

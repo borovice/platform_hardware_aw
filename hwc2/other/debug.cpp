@@ -71,6 +71,7 @@ typedef struct hwcDebugFlags{
 	bool showfps;
 	bool dumpLayer;
 	bool closeLayer;
+	bool ctrlfps;
 	int dumpDisplay;
 	int dumpZorder;
 	int closeDisplay;
@@ -320,6 +321,11 @@ void updateDebugFlags(void)
 				hwcDebug->closeLayer = 0;
 				ALOGD("hwc close close layer mode");
 			}
+			if (!hwc_cmp("off.ctrlfps", ps_fix, 0)
+				&& hwcDebug->ctrlfps == 1) {
+				hwcDebug->ctrlfps = 0;
+				ALOGD("hwc close ctrlfps mode");
+			}
 			if(hwc_cmp("off.", ps_fix, 0)
 				&& hwcDebug->on == 1) {
 				hwcDebug->on = 0;
@@ -341,6 +347,11 @@ void updateDebugFlags(void)
 					|| !hwc_cmp("1", ps_fix, 0))) {
 				hwcDebug->showfps = 1;
 				ALOGD("hwc open show fps mode");
+			}
+			if(hwcDebug->ctrlfps == 0
+				&& !hwc_cmp("on.ctrlfps", ps_fix, 0)) {
+				hwcDebug->ctrlfps = 1;
+				ALOGD("hwc open ctrl fps mode");
 			}
 
 			if(hwcDebug->dumpLayer == 0
@@ -446,6 +457,11 @@ void dumpLayerZorder(Layer_t *layer,unsigned int framecout)
     ::munmap(addr_0,size);
     close(fd);
 
+}
+
+bool debugctrlfps(void)
+{
+	return hwcDebug->ctrlfps;
 }
 
 void showfps(Display_t *display)

@@ -1170,16 +1170,28 @@ static void setup3dMode(Display_t *display, disp_layer_info2 *info)
 			info->b_trd_out = 1;
 			info->out_trd_mode = DISP_3D_OUT_MODE_FP;
 			info->fb.flags = DISP_BF_STEREO_SSH;
+			info->screen_win.x = 0;
+			info->screen_win.y = 0;
+			info->screen_win.width = 1920;
+			info->screen_win.height = 1080;
 			break;
 		case DISPLAY_3D_TOP_BOTTOM_HDMI:
 			info->b_trd_out = 1;
 			info->out_trd_mode = DISP_3D_OUT_MODE_FP;
 			info->fb.flags = DISP_BF_STEREO_TB;
+			info->screen_win.x = 0;
+			info->screen_win.y = 0;
+			info->screen_win.width = 1920;
+			info->screen_win.height = 1080;
 			break;
 		case DISPLAY_3D_DUAL_STREAM:
 			info->b_trd_out = 1;
 			info->out_trd_mode = DISP_3D_OUT_MODE_FP;
 			info->fb.flags = DISP_BF_STEREO_FP;
+			info->screen_win.x = 0;
+			info->screen_win.y = 0;
+			info->screen_win.width = 1920;
+			info->screen_win.height = 1080;
 			break;
 		case DISPLAY_2D_DUAL_STREAM:
 		default :
@@ -2231,6 +2243,7 @@ int32_t de2SetVsyncEnabled(Display_t *display, int32_t enabled)
 
 	arg[0] = display->displayId;
 	arg[1] = (enabled == HWC2_VSYNC_ENABLE)?1:0;
+	arg[1] = 0;
 	ALOGV("set display%d vsync enable:%d",display->displayId, enabled);
 	if (ioctl(dispFd, DISP_VSYNC_EVENT_EN, arg)) {
 		ALOGE("DISP_CMD_VSYNC_EVENT_EN ioctl failed: %s", strerror(errno));

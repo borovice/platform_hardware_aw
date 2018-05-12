@@ -434,6 +434,7 @@ extern char* layerType(Layer_t *layer);
 extern void layerCachePut(Layer_t *layer);
 extern void submitLayerCachePut(LayerSubmit_t *submitLayer);
 extern int displayDeviceInit(Display_t ***display);
+extern bool debugctrlfps(void);
 
 extern Layer_t* layerDup(Layer_t *layer, int priveSize);
 extern LayerSubmit_t* submitLayerCacheGet(void);
